@@ -2,39 +2,39 @@
 #define GAME_OBJECTS_H
 
 #include <glad/glad.h>	// OpenGL headers
-#include "glm/glm.hpp"	// Vectors
+#include "glm/glm.hpp"	// Vectors and transformation matrices
 #include "shader.hpp"
 #include "shapes.hpp"
 
 #include <cmath>
 
 // constants
-const float G = 6.6743f;		// Gravitational constant
-const float epsilon = 0.1f;		// Minimal gravitational force to visualize
+const GLfloat G = 6.6743f;		// Gravitational constant
+const GLfloat epsilon = 0.02f;		// Minimal gravitational force to visualize
 
-// The core of all physics object
-// ------------------------------
+// The core of all physics objects
+// -------------------------------
 class PointMass
 {
-private:
-	const float mass;
-	const float gravRadius;
+protected:
+	const GLfloat mass;
+	const GLfloat gravRadius;
 	glm::vec2 position;
 	glm::vec2 velocity;
 	glm::vec2 acceleration;
 
 	// Calculating the gravitational force applied by another point mass
 	// -----------------------------------------------------------------
-	glm::vec2 gravitationalAcceleration(PointMass other)
+	glm::vec2 gravitationalAcceleration(PointMass other) const
 	{
 		glm::vec2 rv = other.getPosition() - this->position;	// Distance vector pointing to the other mass
-		float rl = glm::length(rv);								// Length of distance vector
+		GLfloat rl = glm::length(rv);							// Length of distance vector
 		return G * other.getMass() / (rl * rl * rl) * rv;
 	}
 
 	// Calculating the centrifugal force applied by another point mass
 	// ---------------------------------------------------------------
-	glm::vec2 centrifugalAcceleration(PointMass other)
+	glm::vec2 centrifugalAcceleration(PointMass other) const
 	{
 		/*
 		 *	The following algorithm calculates the centrifugal force using the compononent of the velocity vector v
@@ -52,35 +52,24 @@ private:
 		 */
 
 		glm::vec2 rv = this->position - other.getPosition();			// Distance vector pointing away from the other mass
-		float rl = glm::length(rv);										// Length of the distance vector
+		GLfloat rl = glm::length(rv);									// Length of the distance vector
 		glm::vec2 rv_u = rv / rl;										// Unit vector
 		
 		glm::vec2 velocity_u = glm::normalize(velocity);				// Velocity unit vector
-		float angle = acos(glm::dot(-rv_u, velocity_u));				// Angle between the 2 unit vectors
-		float orbitalVelocity = glm::length(velocity) * sin(angle);		// Length of orthogonal component of the velocity vector
+		GLfloat angle = acos(glm::dot(-rv_u, velocity_u));				// Angle between the 2 unit vectors
+		GLfloat orbitalVelocity = glm::length(velocity) * sin(angle);	// Length of orthogonal component of the velocity vector
 
 		return orbitalVelocity * orbitalVelocity / rl * rv;
 	}
 
-public:
-	// Constructor
-	// Arguments: mass, position.x, position.y
-	// Optional: velocity.x, velocity.y
-	// ---------------------------------------
-	PointMass(float mass, float px, float py, float vx = 0, float vy = 0) : mass(mass), gravRadius(sqrt(G * mass / epsilon))
+	// Drawing a disk for a planet (z = 0) or gravity field (z = 0.5)
+	// --------------------------------------------------------------
+	void drawDisk(Shader shader, GLfloat radius, GLfloat z = 0.0f) const
 	{
-		position = glm::vec2(px, py);
-		velocity = glm::vec2(vx, vy);
-	}
-
-	// Draws the gravitional field as a disk
-	// -------------------------------------
-	void drawField(Shader shader)
-	{
-		// Setting up the disk
+		// Getting the vertices of the disk
 		GLfloat * vertices = getDisk();
 
-		// Drawing the disk
+		// Generating and binding buffers
 		GLuint VBO, VAO;
 		glGenBuffers(1, &VBO);
 
@@ -88,41 +77,145 @@ public:
 		glBindVertexArray(VAO);
 
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * nVertices * 2, vertices, GL_STATIC_DRAW);
 
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
-		
+
+		// Loading the shader and transforming the disk
 		shader.use();
+
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(position, 0.0f));
+		model = glm::translate(model, glm::vec3(position.x, position.y, z));
+		model = glm::scale(model, glm::vec3(radius, radius, 0.0f));
 		shader.setMat4("model", model);
 
-		glDrawArrays(GL_TRIANGLE_FAN, 0, nSegments);
+		// Drawing the disk
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, nVertices);
+
+		// Clearing the buffers to avoid memory leak
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
 	}
 
+
+public:
+	// Constructor
+	// Arguments: mass, position.x, position.y
+	// Optional: velocity.x, velocity.y
+	// ---------------------------------------
+	PointMass(const GLfloat mass, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
+		: mass(mass), gravRadius(sqrt(G * mass / epsilon))
+	{
+		position = glm::vec2(px, py);
+		velocity = glm::vec2(vx, vy);
+	}
+	
+	// Draws the gravity field
+	// -----------------------
+	void drawField(Shader shader) const
+	{
+		drawDisk(shader, getGravRadius(), -0.5f);
+	}
+
+
 	// Getter functions
-	glm::vec2 getPosition()
+	glm::vec2 getPosition() const
 	{
 		return position;
 	}
-	glm::vec2 getVelocity()
+	glm::vec2 getVelocity() const
 	{
 		return velocity;
 	}
-	glm::vec2 getAcceleration()
+	glm::vec2 getAcceleration() const
 	{
 		return acceleration;
 	}
-	float getMass()
+	GLfloat getMass() const
 	{
 		return mass;
 	}
-	float getGravRadius()
+	GLfloat getGravRadius() const
 	{
 		return gravRadius;
 	}
+	virtual std::string getType() const
+	{
+		return "PointMass";
+	}
 
+};
+
+
+// The main object apart from the player
+// -------------------------------------
+class Planet : public PointMass
+{
+protected:
+	GLfloat radius;
+	glm::vec4 color;
+
+public:
+	// Constructor
+	// -----------
+	Planet(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
+		: PointMass(mass, px, py, vx, vy), radius(radius)
+	{
+		color = glm::vec4(r, g, b, 1.0f);
+	};
+
+
+	// Draws the planet
+	// ----------------
+	void draw(Shader shader) const
+	{
+		drawDisk(shader, radius);
+	}
+
+	// Getter functions
+	float getRadius()
+	{
+		return radius;
+	}
+	std::string getType() const
+	{
+		return "Planet";
+	}
+};
+
+
+// A moon orbiting a planet or similar reference object
+// ----------------------------------------------------
+class Moon : public Planet
+{
+protected:
+	Planet& refPlanet;
+
+public:
+	// Constructor
+	// -----------
+	Moon(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, Planet& refPlanet, const GLfloat distance, const GLfloat angle, const bool clockwise)
+		: Planet(mass, radius, r, g, b, 0, 0), refPlanet(refPlanet)
+	{
+		if (refPlanet.getMass() < mass * 2)
+		{
+			std::cout << "Error: Moon's mass is too large" << std::endl;
+		}
+
+		position = refPlanet.getPosition() + distance * glm::vec2(cos(angle), sin(angle));
+
+		// Check objects for intersections
+
+		// Find velocity:
+		// Find orthogonal unit vector, reverse if !clockwise, find v = sqrt(GM/r)
+	}
+
+	std::string getType() const
+	{
+		return "Moon";
+	}
 };
 
 #endif
