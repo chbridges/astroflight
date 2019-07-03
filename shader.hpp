@@ -22,7 +22,7 @@ private:
 	// Utility function for checking shader compilation/linking errors
 	// Arguments: shader or program ID, type (vertex, fragment, program)
 	// -----------------------------------------------------------------
-	void checkErrors(GLuint ID, std::string type)
+	void checkErrors(GLuint ID, std::string type) const
 	{
 		GLint success;
 		GLchar infoLog[1024];
@@ -51,7 +51,7 @@ public:
 	// Constructor: reading compiling and linking shader program
 	// Arguments: Vertex shader and fragment shader filenames without the extensions
 	// -----------------------------------------------------------------------------
-	Shader(const GLchar * vertexFileName, const GLchar * fragmentFileName)
+	Shader(const std::string vertexFileName, const std::string fragmentFileName)
 	{
 		// 1. Reading the shaders
 		// ----------------------
@@ -59,8 +59,8 @@ public:
 		std::ifstream vertexFile, fragmentFile;	// File streams for the vertex/fragment shader code files, respectively
 
 		// Getting the filepath from the arguments
-		std::string vertexPath = "shaders/" + std::string(vertexFileName) + ".vsh";
-		std::string fragmentPath = "shaders/" + std::string(fragmentFileName) + ".fsh";
+		std::string vertexPath = "shaders/" + vertexFileName + ".vsh";
+		std::string fragmentPath = "shaders/" + fragmentFileName + ".fsh";
 
 		// Reading the vertex shader
 		vertexFile.open(vertexPath, std::ios::in);
@@ -128,7 +128,7 @@ public:
 
 	// Using the shader program
 	// ------------------------
-	void use()
+	void use() const
 	{
 		glUseProgram(ID);
 	}

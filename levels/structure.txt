@@ -1,0 +1,6 @@
+nPointMasses
+mass posX posY velocityX velocityY
+nPlanets (has to be at least 2 - first is starting planet and second is target planet)
+mass radius r g b posX posY velocityX velocityY
+nMoons
+mass radius r g b planetIndex distance angle clockwise
