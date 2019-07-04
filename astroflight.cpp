@@ -5,7 +5,6 @@
 // Transformations
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
 
 // Game data
 #include "shapes.hpp"
@@ -26,23 +25,31 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-
+constexpr auto NEXT_LEVEL = 999;
 
 // Settings
-int xpos, ypos;						// Last window position before switching to fullscreen mode
-double cursorX, cursorY;			// Last cursor position upon left click
 const GLuint SCR_WIDTH = 1280;		// Default window width
 const GLuint SCR_HEIGHT = 720;		// Default window height
 const glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+
+// Mouse and window positions
+int windowX, windowY;				// Last window position before switching to fullscreen mode
+double cursorX, cursorY;			// Last cursor position upon left click
 
 // Flags
 bool windowed = true;
 bool wireframe = false;
 bool clicked = false;
+bool nextLevel = false;
 
 // Selected object for gravity field
 unsigned int planetID = -1;
 unsigned int moonID = -1;
+
+// Level management
+std::vector<std::string> levelList;
+unsigned int levelID = 0;
+
 
 // GLFW: Callback function for window size
 // -----------------------------------------------------------------------
@@ -58,8 +65,8 @@ void windowPosCallback(GLFWwindow* window, int x, int y)
 {
 	if (windowed)
 	{
-		xpos = x;
-		ypos = y;
+		windowX = x;
+		windowY = y;
 	}
 }
 
@@ -100,10 +107,16 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		else
 		{
 			//glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
-			glfwSetWindowMonitor(window, NULL, xpos, ypos, SCR_WIDTH, SCR_HEIGHT, 0);
-			glfwSetWindowPos(window, xpos, ypos);
+			glfwSetWindowMonitor(window, NULL, windowX, windowY, SCR_WIDTH, SCR_HEIGHT, 0);
+			glfwSetWindowPos(window, windowX, windowY);
 			windowed = true;
 		}
+	}
+
+	// Skip to next level with N
+	if (key == GLFW_KEY_N && action == GLFW_PRESS)
+	{
+		nextLevel = true;
 	}
 }
 
@@ -117,61 +130,12 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 		glfwGetCursorPos(window, &cursorX, &cursorY);
 		glfwGetWindowSize(window, &width, &height);
 
-		cursorX *= SCR_WIDTH / (float)width;
-		cursorY *= SCR_HEIGHT / (float)height;
+		cursorX *= (float)SCR_WIDTH / (float)width;
+		cursorY *= (float)SCR_HEIGHT / (float)height;
 
 		clicked = true;
 	}
 }
-
-
-// Set up a new shader with the defined projection matrix
-// ------------------------------------------------------
-Shader addShader(const GLchar * vertexFileName, const GLchar * fragmentFileName)
-{
-	Shader newShader(vertexFileName, fragmentFileName);
-	newShader.use();
-	newShader.setMat4("projection", projection);
-	return newShader;
-}
-
-
-// Get a list of valid levels contained in "levels" folder
-// -------------------------------------------------------
-std::vector<Level*> loadLevels(const std::string fileName = "_loadAll")
-{
-	std::vector<Level*> levels;
-
-	if (fileName == "_loadAll")
-	{
-		// Load all levels
-		for (const auto & file : fs::directory_iterator("levels"))
-		{
-			std::string filePath = file.path().string();
-			if (filePath.substr(filePath.length() - 4) == ".lvl")
-			{
-				Level * temp = new Level(filePath);
-				if (temp->isValid())
-					levels.push_back(temp);
-				else
-					delete temp;
-			}
-				
-		}
-	}
-	else
-	{
-		// Load level defined in command line parameter
-		Level * temp = new Level("levels/" + fileName + ".lvl");
-		if (temp->isValid())
-			levels.push_back(temp);
-		else
-			delete temp;
-	}
-
-	return levels;
-}
-
 
 // Toggle gravity fields of planets/moons upon left mouse click
 void toggleFields(Level level)
@@ -216,25 +180,100 @@ void toggleFields(Level level)
 }
 
 
+// Set up a new shader with the defined projection matrix
+// ------------------------------------------------------
+Shader addShader(const GLchar * vertexFileName, const GLchar * fragmentFileName)
+{
+	Shader newShader(vertexFileName, fragmentFileName);
+	newShader.use();
+	newShader.setMat4("projection", projection);
+	return newShader;
+}
+
+
+// Get a list of valid levels contained in "levels" folder
+// -------------------------------------------------------
+std::vector<std::string> loadLevelList(const std::string fileName = "_loadAll")
+{
+	std::vector<std::string> levelList;
+
+	if (fileName == "_loadAll")
+	{
+		// Load all levels and check validity
+		for (const auto & file : fs::directory_iterator("levels"))
+		{
+			std::string filePath = file.path().string();
+			if (filePath.substr(filePath.length() - 4) == ".lvl")
+			{
+				Level temp(filePath);
+				if (temp.isValid())
+					levelList.push_back(temp.getName());
+			}
+				
+		}
+	}
+	else
+	{
+		// Load level defined in command line parameter and check validity
+		Level temp("levels/" + fileName + ".lvl");
+		if (temp.isValid())
+			levelList.push_back(temp.getName());
+	}
+
+	return levelList;
+}
+
+// Load a level by name
+// --------------------
+Level loadLevelByName(const std::string name)
+{
+	return Level("levels/" + name + ".lvl");
+}
+
+
+// Load a level by ID or next level
+// --------------------------------
+void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = false)
+{
+	nextLevel = false;
+
+	if (shuffle)
+	{
+		// open random level
+	}
+	else if (ID == NEXT_LEVEL)
+	{
+		if (++levelID == levelList.size())
+			levelID = 0;
+	}
+	else
+	{
+		if (ID < levelList.size())
+			levelID = ID;
+	}
+	
+	level = loadLevelByName(levelList[levelID]);
+	level.genPhysics();
+	std::cout << "Loaded level: " << level.getName() << std::endl;
+}
+
+
 int main(int argc, char * argv[])
 {
 	// Load level list
 	// ---------------
-	std::vector<Level*> levels;
-
 	if (argc == 1)
-		levels = loadLevels();
+		levelList = loadLevelList();
 	else
-		levels = loadLevels(argv[1]);
+		levelList = loadLevelList(argv[1]);
 
-	std::cout << "Loaded levels: " << levels.size() << std::endl;
-	for (Level *level : levels)
+	std::cout << "Loaded levels: " << levelList.size() << std::endl;
+	for (auto name  : levelList)
 	{
-		std::cout << level->getName() << std::endl;
-		level->genPhysics();
+		std::cout << name << std::endl;
 	}
 
-	if (levels.size() == 0)
+	if (levelList.size() == 0)
 	{
 		std::cout << "Directory 'level' must contain at least 1 valid level with file extension '.lvl'\n";
 		std::cout << "Press Enter to exit";
@@ -242,8 +281,9 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	Level level = *levels[0];
-
+	Level level = loadLevelByName(levelList[levelID]);
+	level.genPhysics();
+	std::cout << "Loaded level: " << level.getName() << std::endl;
 
 	// GLFW: Setup
 	// -----------
@@ -267,7 +307,7 @@ int main(int argc, char * argv[])
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
-	glfwGetWindowPos(window, &xpos, &ypos);
+	glfwGetWindowPos(window, &windowX, &windowY);
 
 	// Setting callback functions
 	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
@@ -288,24 +328,28 @@ int main(int argc, char * argv[])
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
-	glEnable(GL_MULTISAMPLE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_MULTISAMPLE);
+
 
 	// Building necessary shader programs
 	// ----------------------------------
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
-	Shader shaderPlanet = addShader("vSimple", "fPlanet");			// Planets and trabants
+	Shader shaderPlanet = addShader("vSimple", "fPlanet");			// Planets and moons
 
 
 	// Render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
-	{
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		// Toggle gravity field
+	{	
+		// Handle inputs
 		if (clicked)
 			toggleFields(level);
+		if (nextLevel)
+			changeLevel(level);
+
+		// Clear buffers
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Draw objects
 		for (auto pm : level.getPointMasses())
@@ -320,7 +364,6 @@ int main(int argc, char * argv[])
 			level.getPlanets()[planetID].drawField(shaderField);
 		if (moonID != -1)
 			level.getMoons()[moonID].drawField(shaderField);
-
 
 		// glfw: swap buffers and poll IO events
 		// -------------------------------------
