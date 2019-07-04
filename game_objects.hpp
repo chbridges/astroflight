@@ -155,7 +155,7 @@ class Planet : public PointMass
 {
 protected:
 	GLfloat radius;
-	glm::vec4 color;
+	glm::vec3 color;
 
 public:
 	// Constructor
@@ -163,7 +163,7 @@ public:
 	Planet(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
 		: PointMass(mass, px, py, vx, vy), radius(radius)
 	{
-		color = glm::vec4(r, g, b, 1.0f);
+		color = glm::vec3(r, g, b);
 	};
 
 
@@ -171,6 +171,8 @@ public:
 	// ----------------
 	void draw(Shader shader) const
 	{
+		shader.use();
+		shader.setVec3("color", color);
 		drawDisk(shader, radius);
 	}
 
