@@ -10,7 +10,7 @@
 
 // constants
 const GLfloat G = 6.6743f;		// Gravitational constant
-const GLfloat epsilon = 0.02f;		// Minimal gravitational force to visualize
+const GLfloat epsilon = 0.03f;	// Minimal gravitational force to visualize
 
 // The core of all physics objects
 // -------------------------------
@@ -192,13 +192,13 @@ public:
 // ----------------------------------------------------
 class Moon : public Planet
 {
-protected:
-	Planet& refPlanet;
+private:
+	const Planet& refPlanet;
 
 public:
 	// Constructor
 	// -----------
-	Moon(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, Planet& refPlanet, const GLfloat distance, const GLfloat angle, const bool clockwise)
+	Moon(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, const Planet& refPlanet, const GLfloat distance, const GLfloat angle, const bool clockwise)
 		: Planet(mass, radius, r, g, b, 0, 0), refPlanet(refPlanet)
 	{
 		if (refPlanet.getMass() < mass * 2)
