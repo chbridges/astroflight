@@ -8,8 +8,8 @@ void main()
 {
     //float alpha = 1.0f - length(vtxData);
 
-    float green = 1.0f - length(vtxData);
-    float red = length(vtxData);
+    float red = 1.0f - length(vtxData) * length(vtxData);
+    float green = length(vtxData) * length(vtxData);
 
     fragColor = vec4(red, green, 0.0f, 0.2f);
 }

@@ -17,8 +17,16 @@
 
 // Level list
 #include <vector>
+
+#if __has_include(<filesystem>)
+#include <filesystem>
+namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
+#endif
+
+
 
 // Settings
 int xpos, ypos;						// Last window position before switching to fullscreen mode
@@ -128,8 +136,8 @@ Shader addShader(const GLchar * vertexFileName, const GLchar * fragmentFileName)
 }
 
 
-// Get a list of levels contained in "levels" folder
-// -------------------------------------------------
+// Get a list of valid levels contained in "levels" folder
+// -------------------------------------------------------
 std::vector<Level*> loadLevels(const std::string fileName = "_loadAll")
 {
 	std::vector<Level*> levels;
@@ -234,7 +242,8 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	Level& level = *levels[0];
+	Level level = *levels[0];
+
 
 	// GLFW: Setup
 	// -----------
@@ -285,27 +294,27 @@ int main(int argc, char * argv[])
 	// Building necessary shader programs
 	// ----------------------------------
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
-	Shader shaderPlanet = addShader("vColor", "fVtxColor");			// Planets and trabants
+	Shader shaderPlanet = addShader("vSimple", "fPlanet");			// Planets and trabants
 
 
-	// render loop
+	// Render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
 	{
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
+		// Toggle gravity field
 		if (clicked)
 			toggleFields(level);
 
-		// Draw point masses
+		// Draw objects
 		for (auto pm : level.getPointMasses())
 			pm.drawField(shaderField);
-		// Draw planets
 		for (auto planet : level.getPlanets())
 			planet.draw(shaderPlanet);
-		// Draw moons
 		for (auto moon : level.getMoons())
 			moon.draw(shaderPlanet);
+
 		// Draw gravity field
 		if (planetID != -1)
 			level.getPlanets()[planetID].drawField(shaderField);

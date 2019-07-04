@@ -80,10 +80,12 @@ public:
 				moons.push_back(temp);
 			}
 
+			/*
 			std::cout << "Point masses generated: " << pointMasses.size() << std::endl;
 			std::cout << "Planets generated: " << planets.size() << std::endl;
 			std::cout << "Moons generated: " << moons.size() << std::endl;
 			std::cout << "Total generated: " << physicsCore.size() << std::endl;
+			*/
 
 			levelFile.close();
 		}
