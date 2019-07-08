@@ -8,9 +8,11 @@
 
 
 // constants
-const float twicePi = 2 * 3.141592653589793f;
-const int nSegments = 100;		// Number of circle segments
-const int nVertices = nSegments + 2;
+const GLfloat pi = 3.141592653589793f;
+const GLfloat twicePi = 2.0f * pi;
+const GLfloat halfPi = pi / 2.0f;
+const GLint nSegments = 100;		// Number of circle segments
+const GLint nVertices = nSegments + 2;
 
 GLfloat * getDisk()
 {
@@ -25,5 +27,6 @@ GLfloat * getDisk()
 
 	return vertices;
 }
+
 
 #endif
