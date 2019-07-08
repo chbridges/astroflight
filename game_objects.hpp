@@ -43,8 +43,8 @@ protected:
 		 *		u*v = |u|*|v|*cos(theta)
 		 *	or for normalized vectors:
 		 *		u*v = cos(theta)
-		 *	For 90° the orbital velocity is equal to the velocity, i.e. scalar = 1 = sin(90°).
-		 *	For 0° the orbital velocity is 0, i.e. scalar = 0 = sin(0°).
+		 *	For 90ï¿½ the orbital velocity is equal to the velocity, i.e. scalar = 1 = sin(90ï¿½).
+		 *	For 0ï¿½ the orbital velocity is 0, i.e. scalar = 0 = sin(0ï¿½).
 		 *	The vector representing the centrifugal acceleration therefore has the length
 		 *		|v|*|sin(theta)|
 		 *    = |v|*|sin(arccos(u*v))|	, u and v being unit vectors
@@ -243,7 +243,7 @@ public:
 		// Find velocity:
 		// Find orthogonal unit vector, reverse if !clockwise, find v = sqrt(GM/r)
 		const GLfloat orthogonalAngle = clockwise ? angle + halfPi : angle - halfPi;
-		velocity = sqrt(G * refPlanet.getMass() / distance) * glm::vec2(cos(orthogonalAngle), sin(orthogonalAngle));
+		velocity = (float)sqrt(G * refPlanet.getMass() / distance) * glm::vec2(cos(orthogonalAngle), sin(orthogonalAngle));
 	}
 
 	void accelerate()
