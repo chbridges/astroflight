@@ -20,6 +20,7 @@ private:
 	std::vector<Planet> planets;
 	std::vector<Moon> moons;
 	std::vector<PointMass*> physicsCore;
+	std::vector<Star> stars;
 
 public:
 	Level(const std::string filePath)
@@ -121,19 +122,19 @@ public:
 	{
 		return valid;
 	}
-	std::vector<PointMass> getPointMasses() const
+	std::vector<PointMass>& getPointMasses()
 	{
 		return pointMasses;
 	}
-	std::vector<Planet> getPlanets() const
+	std::vector<Planet>& getPlanets()
 	{
 		return planets;
 	}
-	std::vector<Moon> getMoons() const
+	std::vector<Moon>& getMoons()
 	{
 		return moons;
 	}
-	std::vector<PointMass*> getPhysics() const
+	std::vector<PointMass*>& getPhysics()
 	{
 		return physicsCore;
 	}
