@@ -32,6 +32,8 @@ const GLuint SCR_WIDTH = 1280;		// Default window width
 const GLuint SCR_HEIGHT = 720;		// Default window height
 const glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
 
+const float physicsFPS = 60.0f;		// Game speed, independent of the rendering speed
+
 // Mouse and window positions
 int windowX, windowY;				// Last window position before switching to fullscreen mode
 double cursorX, cursorY;			// Last cursor position upon left click
@@ -41,6 +43,8 @@ bool windowed = true;
 bool wireframe = false;
 bool clicked = false;
 bool nextLevel = false;
+bool restartLevel = false;
+bool showFPS = false;
 
 // Selected object for gravity field
 unsigned int planetID = -1;
@@ -49,6 +53,13 @@ unsigned int moonID = -1;
 // Level management
 std::vector<std::string> levelList;
 unsigned int levelID = 0;
+
+// Tick rate management
+const float physicsTickRate = 1.0f / physicsFPS;	// Physics updates per second
+unsigned int frameCount = 0;						// Frames per second
+double currentTime = glfwGetTime();					// For measuring time intervals
+double lastSecond = currentTime;					// Update every second to measure FPS
+double lastTick = currentTime;						// Update every tick
 
 
 // GLFW: Callback function for window size
@@ -118,6 +129,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	{
 		nextLevel = true;
 	}
+
+	// Restart current level with R
+	if (key == GLFW_KEY_R && action == GLFW_PRESS)
+	{
+		nextLevel = true;
+		restartLevel = true;
+	}
 }
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -154,7 +172,6 @@ void toggleFields(Level level)
 			}
 			else
 				planetID = -1;
-			clicked = false;
 			return;
 		}
 	}
@@ -171,12 +188,9 @@ void toggleFields(Level level)
 			}
 			else
 				moonID = -1;
-			clicked = false;
 			return;
 		}
 	}
-
-	clicked = false;
 }
 
 
@@ -223,6 +237,7 @@ std::vector<std::string> loadLevelList(const std::string fileName = "_loadAll")
 	return levelList;
 }
 
+
 // Load a level by name
 // --------------------
 Level loadLevelByName(const std::string name)
@@ -235,8 +250,6 @@ Level loadLevelByName(const std::string name)
 // --------------------------------
 void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = false)
 {
-	nextLevel = false;
-
 	if (shuffle)
 	{
 		// open random level
@@ -253,7 +266,6 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 	}
 	
 	level = loadLevelByName(levelList[levelID]);
-	level.genPhysics();
 	std::cout << "Loaded level: " << level.getName() << std::endl;
 }
 
@@ -282,7 +294,6 @@ int main(int argc, char * argv[])
 	}
 
 	Level level = loadLevelByName(levelList[levelID]);
-	level.genPhysics();
 	std::cout << "Loaded level: " << level.getName() << std::endl;
 
 	// GLFW: Setup
@@ -338,15 +349,54 @@ int main(int argc, char * argv[])
 	Shader shaderPlanet = addShader("vSimple", "fPlanet");			// Planets and moons
 
 
-	// Render loop
+	// Game loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
 	{	
+		currentTime = glfwGetTime();
+
+		if (currentTime - lastSecond >= 1.0f)
+		{
+			lastSecond = currentTime;
+			std::cout << "FPS: " << frameCount << std::endl;
+			frameCount = 0;
+		}
+		else
+			++frameCount;
+
+
 		// Handle inputs
 		if (clicked)
+		{
 			toggleFields(level);
+			clicked = false;
+		}
+			
 		if (nextLevel)
-			changeLevel(level);
+		{
+			if (restartLevel)
+				changeLevel(level, levelID);
+			else
+				changeLevel(level);
+			planetID = -1;
+			moonID = -1;
+			nextLevel = false;
+			restartLevel = false;
+		}
+			
+
+		// Move objects
+		if (currentTime - lastTick > physicsTickRate)
+		{
+			lastTick = currentTime;
+
+			for (auto & pm : level.getPointMasses())
+				pm.move();
+			for (auto & planet : level.getPlanets())
+				planet.move();
+			for (auto & moon : level.getMoons())
+				moon.move();
+		}
 
 		// Clear buffers
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -356,7 +406,7 @@ int main(int argc, char * argv[])
 			pm.drawField(shaderField);
 		for (auto planet : level.getPlanets())
 			planet.draw(shaderPlanet);
-		for (auto moon : level.getMoons())
+		for (auto & moon : level.getMoons())
 			moon.draw(shaderPlanet);
 
 		// Draw gravity field
