@@ -6,20 +6,23 @@
 #include "shader.hpp"
 #include "shapes.hpp"
 
+#include <vector>
 #include <cmath>
 
 // Constants
-const GLfloat scale = 1.1f;				// Scales gravity force and keeps draw distance consistent
+const GLfloat scale = 1.0f;				// Scales gravity force and keeps draw distance consistent
 const GLfloat G = 6.6743f * scale;		// Scaled gravitational constant
 const GLfloat epsilon = 0.03f * scale;	// Minimal gravitational force to visualize
+const GLfloat spaceShipSize = 25.0f;
+const GLfloat rotationSpeed = 1.0f / 180 * pi;
 
 // The core of all physics objects
 // -------------------------------
 class PointMass
 {
 protected:
-	const GLfloat mass;
-	const GLfloat gravRadius;
+	GLfloat mass;
+	GLfloat gravRadius;
 	glm::vec2 position;
 	glm::vec2 velocity;
 	glm::vec2 acceleration;
@@ -75,10 +78,7 @@ protected:
 
 
 	// Acceleration depends on which forces are supposed to affect the object
-	virtual void accelerate()
-	{
-		
-	}
+	virtual void accelerate() {}
 
 
 	// Drawing a disk for a planet (z = 0) or gravity field (z = 0.5)
@@ -133,7 +133,7 @@ public:
 
 	// Moves the point of mass
 	// -----------------------
-	void move()
+	virtual void move()
 	{
 		accelerate();
 		velocity += acceleration;
@@ -207,7 +207,7 @@ public:
 	}
 
 	// Getter functions
-	float getRadius()
+	float getRadius() const
 	{
 		return radius;
 	}
@@ -243,7 +243,7 @@ public:
 		// Find velocity:
 		// Find orthogonal unit vector, reverse if !clockwise, find v = sqrt(GM/r)
 		const GLfloat orthogonalAngle = clockwise ? angle + halfPi : angle - halfPi;
-		velocity = (float)sqrt(G * refPlanet.getMass() / distance) * glm::vec2(cos(orthogonalAngle), sin(orthogonalAngle));
+		velocity = (GLfloat)sqrt(G * refPlanet.getMass() / distance) * glm::vec2(cos(orthogonalAngle), sin(orthogonalAngle));
 	}
 
 	void accelerate()
@@ -258,10 +258,182 @@ public:
 };
 
 
+class SpaceShip : public PointMass
+{
+private:
+	Planet * startPlanet;
+	GLfloat axis;
+	GLfloat angle;
+	GLfloat launchAngle;
+	GLfloat launchSpeed;
+	unsigned int launchState;	// 0 not launched, 1 launching, 2 launched, 3 boosted, 4 landed
+
+public:
+	SpaceShip(Planet& startPlanet, GLfloat angle = 90.0f)
+		: PointMass(0, 0, 0), startPlanet(&startPlanet), angle(glm::radians(angle)), launchAngle(glm::radians(angle)), launchState(0), axis(startPlanet.getRadius() + spaceShipSize)
+	{
+		// Find initial position
+		GLfloat posX = startPlanet.getPosition().x + (GLfloat)cos(angle) * axis;
+		GLfloat posY = startPlanet.getPosition().y + (GLfloat)sin(angle) * axis;
+		position = glm::vec2(posX, posY);
+
+		// Find minimal launch speed to exit gravity pull
+		launchSpeed = glm::length(gravitationalAcceleration(startPlanet)) * 50;
+	}
+
+	void launchProgress()
+	{
+		switch (launchState)
+		{
+		case 0:
+			++launchState;
+			break;
+		case 1:
+			std::cout << "Tried to progress launch state during launch" << std::endl;
+			break;
+		case 2:
+			velocity.x += launchSpeed * (GLfloat)cos(angle);
+			velocity.y += launchSpeed * (GLfloat)sin(angle);
+			++launchState;
+			break;
+		case 3:
+			std::cout << "Boost already used" << std::endl;
+			break;
+		case 4:
+			std::cout << "Space ship already landed" << std::endl;
+			break;
+		default:
+			std::cout << "launchProgress(): Invalid launch state" << std::endl;
+		}
+
+	}
+
+	void accelerate(std::vector<PointMass*> pointMasses)
+	{
+		acceleration = glm::vec2(0.0f, 0.0f);
+
+		for (PointMass* pm : pointMasses)
+		{
+			acceleration += gravitationalAcceleration(*pm);
+			//acceleration += centrifugalAcceleration(*pm);
+		}
+	}
+
+	void move(std::vector<PointMass*> pointMasses)
+	{
+		GLfloat posX, posY;
+
+		switch (launchState)
+		{
+		case 0:
+			angle = launchAngle;
+			velocity = glm::vec2(0.0f, 0.0f);
+			posX = startPlanet->getPosition().x + (GLfloat)cos(angle) * axis;
+			posY = startPlanet->getPosition().y + (GLfloat)sin(angle) * axis;
+			position = glm::vec2(posX, posY);
+			break;
+
+		case 1:
+			velocity.x += 0.1f * launchSpeed * (GLfloat)cos(angle);
+			velocity.y += 0.1f * launchSpeed * (GLfloat)sin(angle);
+			if (glm::length(velocity) >= launchSpeed)
+			{
+				velocity = glm::normalize(velocity);
+				velocity *= launchSpeed;
+				++launchState;
+			}
+			position += velocity;
+			break;
+
+		default:
+			accelerate(pointMasses);
+			velocity += acceleration;
+			angle = atan2(velocity.y, velocity.x);
+			// Check for collision
+			position += velocity;
+			break;
+		}
+	}
+
+	void rotate(bool clockwise)
+	{
+		if (launchState != 4 && launchState != 1)
+		{
+			if (clockwise)
+				angle -= rotationSpeed;
+			else
+				angle += rotationSpeed;
+		}
+		if (angle < 0)
+			angle += twicePi;
+		else if (angle >= twicePi)
+			angle -= twicePi;
+
+		if (launchState == 0)
+			launchAngle = angle;
+	}
+
+
+	void draw(const Shader& shader) const
+	{
+		// Getting the vertices of the disk
+		GLfloat * vertices = getSpaceShip();
+
+		// Generating and binding buffers
+		GLuint VBO, VAO;
+		glGenBuffers(1, &VBO);
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6, vertices, GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Loading the shader and transforming the disk
+		shader.use();
+		shader.setVec3("color", glm::vec3(200.0f, 200.0f, 200.0f));
+
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(position.x, position.y, 0.5f));
+		model = glm::rotate(model, angle, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, glm::vec3(spaceShipSize, spaceShipSize, 0.0f));
+		shader.setMat4("model", model);
+
+		// Drawing the disk
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		// Clearing the buffers to avoid memory leak
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+	}
+
+
+	void setPlanet(Planet& newPlanet)
+	{
+		this->startPlanet = &newPlanet;
+		axis = startPlanet->getRadius() + spaceShipSize;
+	}
+
+	void setLaunchState(const unsigned int newState)
+	{
+		launchState = newState;
+	}
+
+	unsigned int getLaunchState()
+	{
+		return launchState;
+	}
+};
+
+
 class Star
 {
 public:
-	Star(const GLfloat scr_width, const GLfloat scr_height)
+	Star(const GLfloat scrWidth, const GLfloat scrHeight)
 	{
 		// randomize position and radius in initializer list
 		// use velocity for rotation
@@ -273,5 +445,6 @@ public:
 		// use sine to vary brightness & size, draw disk with gradient shader
 	}
 };
+
 
 #endif

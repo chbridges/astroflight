@@ -24,9 +24,8 @@ private:
 
 public:
 	Level(const std::string filePath)
+		: name(filePath.substr(7, filePath.length() - 11))
 	{
-		name = filePath.substr(7, filePath.length() - 11);
-
 		std::ifstream levelFile;
 
 		levelFile.open(filePath, std::ios::in);
@@ -77,7 +76,7 @@ public:
 					std::cout << "Error: Planet index out of range" << std::endl;
 					continue;
 				}
-				Moon temp(mass, radius, r, g, b, planets[planetIndex], distance, angle, clockwise);
+				Moon temp(mass, radius, r, g, b, planets[planetIndex], distance, glm::radians(angle), clockwise);
 				moons.push_back(temp);
 			}
 
@@ -85,8 +84,8 @@ public:
 			std::cout << "Point masses generated: " << pointMasses.size() << std::endl;
 			std::cout << "Planets generated: " << planets.size() << std::endl;
 			std::cout << "Moons generated: " << moons.size() << std::endl;
-			std::cout << "Total generated: " << physicsCore.size() << std::endl;
 			*/
+			
 
 			levelFile.close();
 		}
