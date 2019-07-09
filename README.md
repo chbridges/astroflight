@@ -3,7 +3,7 @@ A 2D puzzle game based on classical mechanics, astronomy and further principles 
 
 Current development state: Pre-Alpha (essential gameplay features are missing)
 
-## Compilation
+## Compiling
 Required libraries: GLFW3, GLAD, GLM
 
 GLAD settings: gl 4.6, core profile, generate a loader
