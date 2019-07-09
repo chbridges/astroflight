@@ -16,6 +16,7 @@
 
 // Level list
 #include <vector>
+#include <algorithm>
 
 #if __has_include(<filesystem>)
 #include <filesystem>
@@ -45,6 +46,10 @@ bool clicked = false;
 bool nextLevel = false;
 bool restartLevel = false;
 bool showFPS = false;
+bool turnLeft = false;
+bool turnRight = false;
+bool slowMode = false;
+bool launch = false;
 
 // Selected object for gravity field
 unsigned int planetID = -1;
@@ -126,9 +131,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
 	// Skip to next level with N
 	if (key == GLFW_KEY_N && action == GLFW_PRESS)
-	{
 		nextLevel = true;
-	}
 
 	// Restart current level with R
 	if (key == GLFW_KEY_R && action == GLFW_PRESS)
@@ -136,6 +139,24 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		nextLevel = true;
 		restartLevel = true;
 	}
+
+	// Rotating the space ship with arrow keys
+	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+		turnLeft = true;
+	else if (key == GLFW_KEY_LEFT && action == GLFW_RELEASE)
+		turnLeft = false;
+	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
+		turnRight = true;
+	else if (key == GLFW_KEY_RIGHT && action == GLFW_RELEASE)
+		turnRight = false;
+	if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_PRESS)
+		slowMode = true;
+	else if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_RELEASE)
+		slowMode = false;
+
+	// Incrementing launch state
+	if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+		launch = true;
 }
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -234,6 +255,8 @@ std::vector<std::string> loadLevelList(const std::string fileName = "_loadAll")
 			levelList.push_back(temp.getName());
 	}
 
+	std::sort(levelList.begin(), levelList.end());
+
 	return levelList;
 }
 
@@ -266,7 +289,7 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 	}
 	
 	level = loadLevelByName(levelList[levelID]);
-	std::cout << "Loaded level: " << level.getName() << std::endl;
+	std::cout << "Loading level: " << level.getName() << std::endl;
 }
 
 
@@ -294,7 +317,9 @@ int main(int argc, char * argv[])
 	}
 
 	Level level = loadLevelByName(levelList[levelID]);
-	std::cout << "Loaded level: " << level.getName() << std::endl;
+	std::cout << "Loading level: " << level.getName() << std::endl;
+	level.genPhysics();
+	SpaceShip player(level.getPlanets()[0]);
 
 	// GLFW: Setup
 	// -----------
@@ -346,7 +371,7 @@ int main(int argc, char * argv[])
 	// Building necessary shader programs
 	// ----------------------------------
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
-	Shader shaderPlanet = addShader("vSimple", "fPlanet");			// Planets and moons
+	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship
 
 
 	// Game loop
@@ -358,7 +383,7 @@ int main(int argc, char * argv[])
 		if (currentTime - lastSecond >= 1.0f)
 		{
 			lastSecond = currentTime;
-			std::cout << "FPS: " << frameCount << std::endl;
+			//std::cout << "FPS: " << frameCount << std::endl;
 			frameCount = 0;
 		}
 		else
@@ -378,10 +403,19 @@ int main(int argc, char * argv[])
 				changeLevel(level, levelID);
 			else
 				changeLevel(level);
+			level.genPhysics();
+			player.setPlanet(level.getPlanets()[0]);
+			player.setLaunchState(0);
 			planetID = -1;
 			moonID = -1;
 			nextLevel = false;
 			restartLevel = false;
+		}
+
+		if (launch)
+		{
+			player.launchProgress();
+			launch = false;
 		}
 			
 
@@ -390,12 +424,19 @@ int main(int argc, char * argv[])
 		{
 			lastTick = currentTime;
 
+			if (turnLeft)
+				player.rotate(false);
+			if (turnRight)
+				player.rotate(true);
+
 			for (auto & pm : level.getPointMasses())
 				pm.move();
 			for (auto & planet : level.getPlanets())
 				planet.move();
 			for (auto & moon : level.getMoons())
 				moon.move();
+			
+			player.move(level.getPhysics());
 		}
 
 		// Clear buffers
@@ -405,15 +446,18 @@ int main(int argc, char * argv[])
 		for (auto pm : level.getPointMasses())
 			pm.drawField(shaderField);
 		for (auto planet : level.getPlanets())
-			planet.draw(shaderPlanet);
+			planet.draw(shaderSimple);
 		for (auto & moon : level.getMoons())
-			moon.draw(shaderPlanet);
+			moon.draw(shaderSimple);
 
 		// Draw gravity field
 		if (planetID != -1)
 			level.getPlanets()[planetID].drawField(shaderField);
 		if (moonID != -1)
 			level.getMoons()[moonID].drawField(shaderField);
+
+		// Draw the space ship
+		player.draw(shaderSimple);
 
 		// glfw: swap buffers and poll IO events
 		// -------------------------------------
