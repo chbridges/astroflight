@@ -5,7 +5,9 @@ GLFW3, GLAD, GLM
 GLAD settings: gl 4.6, core profile, generate a loader
 
 Put GLM into the working directory.
+
 Linux: Download GLFW3 and GLAD, compile & install using CMake and Make, compile via compile.sh bash script.
+
 Windows: Download the pre-compiled headers for VS or MinGW and link them in your IDE.
 
 ## Controls
