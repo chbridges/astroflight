@@ -22,8 +22,19 @@ GLfloat * getDisk()
 	{
 		vertices[2 * i] = cos(i * twicePi / nSegments);
 		vertices[2 * i + 1] = sin(i * twicePi / nSegments);
-		//std::cout << i << " " << vertices[2 * i] << " " << vertices[2 * i + 1] << std::endl;
 	}
+
+	return vertices;
+}
+
+
+GLfloat * getSpaceShip()
+{
+	static GLfloat vertices[6] = {
+		-1.0f,  0.33f,
+		 1.0f,  0.00f,
+		-1.0f, -0.33f,
+	};
 
 	return vertices;
 }
