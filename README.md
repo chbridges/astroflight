@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# astroflight
-=======
 # AstroFlight (working title)
 A 2D puzzle game based on classical mechanics, astronomy and further principles of physics. Developed in terms of a computer graphics practical as a pure OpenGL project that doesn't use any external ressources such as textures.
 
@@ -36,4 +33,3 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
 
 ## Further planned improvisations
 Better code structure, error handling and readme
->>>>>>> 60299a4e601db974e36ef27659a6662b7a7f19c5
