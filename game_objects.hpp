@@ -12,9 +12,14 @@
 // Constants
 const GLfloat scale = 1.0f;				// Scales gravity force and keeps draw distance consistent
 const GLfloat G = 6.6743f * scale;		// Scaled gravitational constant
-const GLfloat epsilon = 0.03f * scale;	// Minimal gravitational force to visualize
+const GLfloat epsilon = 0.01f * scale;	// Minimal gravitational force to visualize
 const GLfloat spaceShipSize = 25.0f;
-const GLfloat rotationSpeed = 1.0f / 180 * pi;
+const GLfloat rotationSpeed = 1.0f / 180.0f * pi;
+const GLfloat boostPower = 2.0f;
+const GLfloat collisionScale = 0.5f;	// Lower value = smaller collision box, negative values possible
+const GLfloat boxSize = 5.0f;
+const GLfloat boxRotation = 1.0f / 180.0f * pi;
+const GLfloat flagSize = 15.0f;
 
 // The core of all physics objects
 // -------------------------------
@@ -22,6 +27,7 @@ class PointMass
 {
 protected:
 	GLfloat mass;
+	GLfloat radius;
 	GLfloat gravRadius;
 	glm::vec2 position;
 	glm::vec2 velocity;
@@ -46,8 +52,8 @@ protected:
 		 *		u*v = |u|*|v|*cos(theta)
 		 *	or for normalized vectors:
 		 *		u*v = cos(theta)
-		 *	For 90ï¿½ the orbital velocity is equal to the velocity, i.e. scalar = 1 = sin(90ï¿½).
-		 *	For 0ï¿½ the orbital velocity is 0, i.e. scalar = 0 = sin(0ï¿½).
+		 *	For 90° the orbital velocity is equal to the velocity, i.e. scalar = 1 = sin(90°).
+		 *	For 0° the orbital velocity is 0, i.e. scalar = 0 = sin(0°).
 		 *	The vector representing the centrifugal acceleration therefore has the length
 		 *		|v|*|sin(theta)|
 		 *    = |v|*|sin(arccos(u*v))|	, u and v being unit vectors
@@ -125,7 +131,7 @@ public:
 	// Optional: velocity.x, velocity.y
 	// ---------------------------------------
 	PointMass(const GLfloat mass, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
-		: mass(mass), gravRadius(sqrt(G * mass / epsilon)), acceleration(glm::vec2(0.0f, 0.0f))
+		: mass(mass), gravRadius(sqrt(G * mass / epsilon)), radius(0), acceleration(glm::vec2(0.0f, 0.0f))
 	{
 		position = glm::vec2(px, py);
 		velocity = glm::vec2(vx, vy);
@@ -139,6 +145,7 @@ public:
 		velocity += acceleration;
 
 		// Check for collision
+		// glm::vec2 newPosition = position + velocity;
 		position += velocity;
 	}
 
@@ -168,6 +175,10 @@ public:
 	{
 		return mass;
 	}
+	GLfloat getRadius() const
+	{
+		return radius;
+	}
 	GLfloat getGravRadius() const
 	{
 		return gravRadius;
@@ -185,15 +196,16 @@ public:
 class Planet : public PointMass
 {
 protected:
-	const GLfloat radius;
 	const glm::vec3 color;
+	GLuint terraforming;
 
 public:
 	// Constructor
 	// -----------
 	Planet(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
-		: PointMass(mass, px, py, vx, vy), radius(radius), color(glm::vec3(r, g, b))
+		: PointMass(mass, px, py, vx, vy), color(glm::vec3(r, g, b)), terraforming(0)
 	{
+		this->radius = radius;
 	};
 
 
@@ -281,7 +293,7 @@ public:
 		launchSpeed = glm::length(gravitationalAcceleration(startPlanet)) * 50;
 	}
 
-	void launchProgress()
+	void launchProgress(const bool boost = false)
 	{
 		switch (launchState)
 		{
@@ -292,8 +304,8 @@ public:
 			std::cout << "Tried to progress launch state during launch" << std::endl;
 			break;
 		case 2:
-			velocity.x += launchSpeed * (GLfloat)cos(angle);
-			velocity.y += launchSpeed * (GLfloat)sin(angle);
+			velocity.x += boostPower * (GLfloat)cos(angle);
+			velocity.y += boostPower * (GLfloat)sin(angle);
 			++launchState;
 			break;
 		case 3:
@@ -334,35 +346,59 @@ public:
 			break;
 
 		case 1:
-			velocity.x += 0.1f * launchSpeed * (GLfloat)cos(angle);
-			velocity.y += 0.1f * launchSpeed * (GLfloat)sin(angle);
+			velocity.x = launchSpeed * (GLfloat)cos(angle);
+			velocity.y = launchSpeed * (GLfloat)sin(angle);
+
+			/*
+			/velocity.x += 0.1f * launchSpeed * (GLfloat)cos(angle);
+			/velocity.y += 0.1f * launchSpeed * (GLfloat)sin(angle);
+
 			if (glm::length(velocity) >= launchSpeed)
 			{
 				velocity = glm::normalize(velocity);
 				velocity *= launchSpeed;
 				++launchState;
 			}
+			*/
+
+			++launchState;
 			position += velocity;
 			break;
 
+		case 4:
+			break;
+		
+		// case 2 and 3
 		default:
 			accelerate(pointMasses);
 			velocity += acceleration;
-			angle = atan2(velocity.y, velocity.x);
+			angle = atan2(velocity.y, velocity.x);	// rotation
+			glm::vec2 newPosition = position + velocity;
+
 			// Check for collision
-			position += velocity;
-			break;
+			for (PointMass* pm : pointMasses)
+			{
+				if (glm::distance(newPosition, pm->getPosition()) - pm->getRadius() <= collisionScale * spaceShipSize * 0.17f)
+				{
+					launchState = 4;
+					return;
+				}
+			}
+
+			position = newPosition;
 		}
 	}
 
-	void rotate(bool clockwise)
+	void rotate(bool clockwise, bool precisionMode)
 	{
-		if (launchState != 4 && launchState != 1)
+		const GLfloat precisionScale = precisionMode ? 0.5f : 1.0f;
+
+		if (launchState == 0)
 		{
 			if (clockwise)
-				angle -= rotationSpeed;
+				angle -= rotationSpeed * precisionScale;
 			else
-				angle += rotationSpeed;
+				angle += rotationSpeed * precisionScale;
 		}
 		if (angle < 0)
 			angle += twicePi;
@@ -371,6 +407,25 @@ public:
 
 		if (launchState == 0)
 			launchAngle = angle;
+	}
+
+	void adjustSpeed(bool increase, bool precisionMode)
+	{
+		const GLfloat precisionScale = precisionMode ? 0.5f : 1.0f;
+
+		if (launchState == 0)
+		{
+			if (increase)
+				++launchSpeed;
+			else
+			{
+				--launchSpeed;
+			}
+		}
+		if (launchSpeed < 1)
+			++launchSpeed;
+		else if (launchSpeed > 10)
+			--launchSpeed;
 	}
 
 
@@ -387,7 +442,7 @@ public:
 		glBindVertexArray(VAO);
 
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6, vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 12, vertices, GL_STATIC_DRAW);
 
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
@@ -404,7 +459,7 @@ public:
 
 		// Drawing the disk
 		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDrawArrays(GL_TRIANGLES, 0, 12);
 
 		// Clearing the buffers to avoid memory leak
 		glDeleteVertexArrays(1, &VAO);
@@ -412,10 +467,16 @@ public:
 	}
 
 
-	void setPlanet(Planet& newPlanet)
+	void setPlanet(Planet& newPlanet, const bool reset = false)
 	{
 		this->startPlanet = &newPlanet;
 		axis = startPlanet->getRadius() + spaceShipSize;
+
+		GLfloat posX = startPlanet->getPosition().x + (GLfloat)cos(angle) * axis;
+		GLfloat posY = startPlanet->getPosition().y + (GLfloat)sin(angle) * axis;
+		position = glm::vec2(posX, posY);
+		if (not reset)
+			launchSpeed = glm::length(gravitationalAcceleration(*startPlanet)) * 50;
 	}
 
 	void setLaunchState(const unsigned int newState)
@@ -423,9 +484,111 @@ public:
 		launchState = newState;
 	}
 
-	unsigned int getLaunchState()
+	unsigned int getLaunchState() const
 	{
 		return launchState;
+	}
+
+	GLfloat getAngle() const
+	{
+		return glm::degrees(angle);
+	}
+
+	GLfloat getLaunchSpeed() const
+	{
+		return launchSpeed;
+	}
+};
+
+
+class Box : public PointMass
+{
+private:
+	const std::vector<PointMass*> pointMasses;
+	GLfloat rotation;
+	bool landed;
+	glm::vec2 restDirection;
+
+	void accelerate(std::vector<PointMass*> pointMasses)
+	{
+		acceleration = glm::vec2(0.0f, 0.0f);
+		for (PointMass* pm : pointMasses)
+			acceleration += gravitationalAcceleration(*pm);
+	}
+
+
+public:
+	Box(const SpaceShip& player, const std::vector<PointMass*> pointMasses)
+		: PointMass(0, player.getPosition().x, player.getPosition().y), pointMasses(pointMasses), restDirection(-player.getVelocity()), rotation(0), landed(false)
+	{}
+
+	void accelerate()
+	{
+		acceleration = glm::vec2(0.0f, 0.0f);
+		for (PointMass* pm : pointMasses)
+			acceleration += gravitationalAcceleration(*pm);
+	}
+
+	void move()
+	{
+		if (landed)
+			return;
+
+		accelerate();
+		const GLfloat angle = glm::length(velocity) == 0 ? glm::dot(acceleration, restDirection) : glm::dot(acceleration, velocity);
+		rotation += angle;
+		velocity += acceleration;
+
+		glm::vec2 newPosition = position + velocity;
+		// Check for collision
+		for (PointMass* pm : pointMasses)
+		{
+			if (glm::distance(newPosition, pm->getPosition()) - pm->getRadius() <= collisionScale * boxSize * 0.67f)
+				landed = true;
+		}
+
+		position += velocity;
+	}
+
+
+	void draw(const Shader& shader) const
+	{
+		if (landed)
+			return;
+
+		// Getting the vertices of the box
+		GLfloat * vertices = getBox();
+
+		// Generating and binding buffers
+		GLuint VBO, VAO;
+		glGenBuffers(1, &VBO);
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 12, vertices, GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Loading the shader and transforming the disk
+		shader.use();
+		shader.setVec3("color", glm::vec3(152.0f, 80.0f, 6.0f));
+
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(position.x, position.y, 0.5f));
+		model = glm::rotate(model, rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, glm::vec3(boxSize, boxSize, 0.0f));
+		shader.setMat4("model", model);
+
+		// Drawing the disk
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 12);
+
+		// Clearing the buffers to avoid memory leak
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
 	}
 };
 
@@ -446,5 +609,85 @@ public:
 	}
 };
 
+
+class Flag
+{
+private:
+	Planet * goal;
+	glm::vec2 position;
+	GLfloat time;
+
+public:
+	Flag(Planet& goal)
+		: goal(&goal), position(goal.getPosition()), time(-(GLfloat)glfwGetTime() * 0.1f + 1.6f)
+	{}
+
+	void setPlanet(Planet& newPlanet)
+	{
+		this->goal = &newPlanet;
+		position = goal->getPosition();
+	}
+
+	void move()
+	{
+		time = -(GLfloat)glfwGetTime() * 0.1f + 1.6f;
+	}
+
+	void draw(const Shader& shader)
+	{
+		shader.use();
+
+		// Getting the vertices of the flag
+		GLfloat * pole = getFlagPole();
+		GLfloat * flag = getFlag();
+
+		// Generating and binding buffers
+		GLuint VBO[2], VAO[2];
+		glGenBuffers(2, VBO);
+		glGenVertexArrays(2, VAO);
+
+		// Pole
+		glBindVertexArray(VAO[0]);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 12, pole, GL_STATIC_DRAW);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Flag
+		glBindVertexArray(VAO[1]);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 12, flag, GL_STATIC_DRAW);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Loading the shader and transforming the pole
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(position.x + (flagSize + goal->getRadius()) * cos(time), position.y + (flagSize + goal->getRadius()) * sin(time), 0.5f));
+		model = glm::rotate(model, time + halfPi, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, glm::vec3(flagSize, flagSize, 0.0f));
+		shader.setMat4("model", model);
+		shader.setVec3("color", glm::vec3(178.0f, 178.0f, 178.0f));
+
+		// Drawing the pole
+		glBindVertexArray(VAO[0]);
+		glDrawArrays(GL_TRIANGLES, 0, 12);
+
+		// Transforming the flag
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(position.x + (flagSize * 1.1f + goal->getRadius()) * cos(time), position.y + (flagSize + 0.3f + goal->getRadius()) * sin(time), 0.5f));
+		model = glm::rotate(model, time - halfPi, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, glm::vec3(flagSize, flagSize, 0.0f));
+		shader.setMat4("model", model);
+		shader.setVec3("color", glm::vec3(239.0f, 35.0f, 31.0f));
+
+		// Drawing the flag
+		glBindVertexArray(VAO[1]);
+		glDrawArrays(GL_TRIANGLES, 0, 12);
+
+		// Clearing the buffers to avoid memory leak
+		glDeleteVertexArrays(2, VAO);
+		glDeleteBuffers(2, VBO);
+	}
+};
 
 #endif

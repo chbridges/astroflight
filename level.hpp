@@ -21,6 +21,7 @@ private:
 	std::vector<Moon> moons;
 	std::vector<PointMass*> physicsCore;
 	std::vector<Star> stars;
+	std::vector<Box> boxes;
 
 public:
 	Level(const std::string filePath)
@@ -111,6 +112,20 @@ public:
 			physicsCore.push_back(dynamic_cast<PointMass*>(&m));
 	}
 
+
+	// Move objects in level
+	void updatePhysics()
+	{
+		for (auto & pm : pointMasses)
+			pm.move();
+		for (auto & planet : planets)
+			planet.move();
+		for (auto & moon : moons)
+			moon.move();
+		for (auto & box : boxes)
+			box.move();
+	}
+
 	// Getter functions
 	// ----------------
 	std::string getName() const
@@ -136,6 +151,10 @@ public:
 	std::vector<PointMass*>& getPhysics()
 	{
 		return physicsCore;
+	}
+	std::vector<Box>& getBoxes()
+	{
+		return boxes;
 	}
 };
 

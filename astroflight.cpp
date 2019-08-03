@@ -34,6 +34,7 @@ const GLuint SCR_HEIGHT = 720;		// Default window height
 const glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
 
 const float physicsFPS = 60.0f;		// Game speed, independent of the rendering speed
+const unsigned int maxBoxes = 3;
 
 // Mouse and window positions
 int windowX, windowY;				// Last window position before switching to fullscreen mode
@@ -48,7 +49,10 @@ bool restartLevel = false;
 bool showFPS = false;
 bool turnLeft = false;
 bool turnRight = false;
-bool slowMode = false;
+bool increaseSpeed = false;
+bool decreaseSpeed = false;
+bool boost = false;
+bool precisionMode = false;
 bool launch = false;
 
 // Selected object for gravity field
@@ -65,6 +69,7 @@ unsigned int frameCount = 0;						// Frames per second
 double currentTime = glfwGetTime();					// For measuring time intervals
 double lastSecond = currentTime;					// Update every second to measure FPS
 double lastTick = currentTime;						// Update every tick
+double outOfBounds = 0.0f;							// Measures how long player has been outside the window
 
 
 // GLFW: Callback function for window size
@@ -150,12 +155,18 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	else if (key == GLFW_KEY_RIGHT && action == GLFW_RELEASE)
 		turnRight = false;
 	if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_PRESS)
-		slowMode = true;
+		precisionMode = true;
 	else if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_RELEASE)
-		slowMode = false;
+		precisionMode = false;
 
-	// Incrementing launch state
+	// Increment/Decrement launch speed or use boost
 	if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+		increaseSpeed = true;
+	if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+		decreaseSpeed = true;
+
+	// Launch or drop box
+	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
 		launch = true;
 }
 
@@ -289,7 +300,7 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 	}
 	
 	level = loadLevelByName(levelList[levelID]);
-	std::cout << "Loading level: " << level.getName() << std::endl;
+	std::cout << "Loaded level: " << level.getName() << std::endl;
 }
 
 
@@ -320,6 +331,7 @@ int main(int argc, char * argv[])
 	std::cout << "Loading level: " << level.getName() << std::endl;
 	level.genPhysics();
 	SpaceShip player(level.getPlanets()[0]);
+	Flag flag(level.getPlanets()[1]);
 
 	// GLFW: Setup
 	// -----------
@@ -383,8 +395,9 @@ int main(int argc, char * argv[])
 		if (currentTime - lastSecond >= 1.0f)
 		{
 			lastSecond = currentTime;
-			//std::cout << "FPS: " << frameCount << std::endl;
+			std::cout << "FPS: " << frameCount << std::endl;
 			frameCount = 0;
+			std::cout << (int)player.getLaunchSpeed();
 		}
 		else
 			++frameCount;
@@ -404,8 +417,9 @@ int main(int argc, char * argv[])
 			else
 				changeLevel(level);
 			level.genPhysics();
-			player.setPlanet(level.getPlanets()[0]);
+			player.setPlanet(level.getPlanets()[0], true);
 			player.setLaunchState(0);
+			flag.setPlanet(level.getPlanets()[1]);
 			planetID = -1;
 			moonID = -1;
 			nextLevel = false;
@@ -414,8 +428,31 @@ int main(int argc, char * argv[])
 
 		if (launch)
 		{
-			player.launchProgress();
+			if (player.getLaunchState() == 0)
+				player.launchProgress();
+			else if (player.getLaunchState() < 4)
+			{
+				if (level.getBoxes().size() < maxBoxes)
+					level.getBoxes().push_back(Box(player, level.getPhysics()));
+			}
+				
 			launch = false;
+		}
+
+		if (increaseSpeed)
+		{
+			if (player.getLaunchState() == 0)
+				player.adjustSpeed(true, precisionMode);
+			else if (player.getLaunchState() == 2)
+				player.launchProgress();
+			increaseSpeed = false;
+		}
+
+		if (decreaseSpeed)
+		{
+			if (player.getLaunchState() == 0)
+				player.adjustSpeed(false, precisionMode);
+			decreaseSpeed = false;
 		}
 			
 
@@ -425,39 +462,52 @@ int main(int argc, char * argv[])
 			lastTick = currentTime;
 
 			if (turnLeft)
-				player.rotate(false);
+				player.rotate(false, precisionMode);
 			if (turnRight)
-				player.rotate(true);
+				player.rotate(true, precisionMode);
 
-			for (auto & pm : level.getPointMasses())
-				pm.move();
-			for (auto & planet : level.getPlanets())
-				planet.move();
-			for (auto & moon : level.getMoons())
-				moon.move();
-			
-			player.move(level.getPhysics());
+			if (player.getLaunchState() < 4)
+			{
+				level.updatePhysics();
+				player.move(level.getPhysics());
+				flag.move();
+			}
+			else
+			{
+				if (glm::distance(player.getPosition(), level.getPlanets()[1].getPosition()) <= level.getPlanets()[1].getRadius())
+				{
+					// won
+				}
+				else
+				{
+					// lost
+				}
+			}
+
+			// Check if one of the boxes hit a planet
 		}
 
 		// Clear buffers
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Draw objects
+		player.draw(shaderSimple);
+		flag.draw(shaderSimple);
+
 		for (auto pm : level.getPointMasses())
 			pm.drawField(shaderField);
 		for (auto planet : level.getPlanets())
 			planet.draw(shaderSimple);
 		for (auto & moon : level.getMoons())
 			moon.draw(shaderSimple);
+		for (auto & box : level.getBoxes())
+			box.draw(shaderSimple);
 
 		// Draw gravity field
 		if (planetID != -1)
 			level.getPlanets()[planetID].drawField(shaderField);
 		if (moonID != -1)
 			level.getMoons()[moonID].drawField(shaderField);
-
-		// Draw the space ship
-		player.draw(shaderSimple);
 
 		// glfw: swap buffers and poll IO events
 		// -------------------------------------

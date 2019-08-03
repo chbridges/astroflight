@@ -30,10 +30,57 @@ GLfloat * getDisk()
 
 GLfloat * getSpaceShip()
 {
-	static GLfloat vertices[6] = {
-		-1.0f,  0.33f,
-		 1.0f,  0.00f,
-		-1.0f, -0.33f,
+	static GLfloat vertices[12] = {
+		 -1.0f,  0.33f,
+		  0.6f,  0.00f,
+		 -0.6f,  0.00f,
+		 -1.0f, -0.33f,
+		  0.6f,  0.00f,
+		 -0.6f,  0.00f
+	};
+
+	return vertices;
+}
+
+
+GLfloat * getBox()
+{
+	static GLfloat vertices[12] = {
+		-1.0f, -0.75f,
+		-1.0f,  0.75f,
+		 1.0f,  0.75f,
+		-1.0f, -0.75f,
+		 1.0f, -0.75f,
+		 1.0f,  0.75f
+	};
+
+	return vertices;
+}
+
+
+GLfloat * getFlagPole()
+{
+	static GLfloat vertices[12] = {
+		-0.05f, -1.0f,
+		-0.05f,  1.0f,
+		 0.05f,  1.0f,
+		-0.05f, -1.0f,
+		 0.05f, -1.0f,
+		 0.05f,  1.0f
+	};
+
+	return vertices;
+}
+
+GLfloat * getFlag()
+{
+	static GLfloat vertices[12] = {
+		0.0f, 0.2f,
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		0.0f, 0.2f,
+		1.0f, 0.2f,
+		1.0f, 1.0f
 	};
 
 	return vertices;
