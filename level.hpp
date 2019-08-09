@@ -15,6 +15,7 @@ class Level
 private:
 	std::string name;
 	bool valid = true;
+	unsigned int score = 0;
 
 	std::vector<PointMass> pointMasses;
 	std::vector<Planet> planets;
@@ -110,6 +111,8 @@ public:
 		// Moons
 		for (auto & m : moons)
 			physicsCore.push_back(dynamic_cast<PointMass*>(&m));
+		planets[0].setTerraforming(100);
+		planets[1].setTerraforming(100);
 	}
 
 
@@ -126,6 +129,11 @@ public:
 			box.move();
 	}
 
+	void updateScore(const int value)
+	{
+		score += value;
+	}
+
 	// Getter functions
 	// ----------------
 	std::string getName() const
@@ -135,6 +143,10 @@ public:
 	bool isValid() const
 	{
 		return valid;
+	}
+	unsigned int getScore() const
+	{
+		return score;
 	}
 	std::vector<PointMass>& getPointMasses()
 	{

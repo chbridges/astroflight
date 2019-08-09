@@ -10,16 +10,20 @@
 #include <cmath>
 
 // Constants
-const GLfloat scale = 1.0f;				// Scales gravity force and keeps draw distance consistent
-const GLfloat G = 6.6743f * scale;		// Scaled gravitational constant
-const GLfloat epsilon = 0.01f * scale;	// Minimal gravitational force to visualize
-const GLfloat spaceShipSize = 25.0f;
+const GLfloat gameSpeed = 0.5f;
+const GLfloat gravityScale = 1.0f;				// Scales gravity force and keeps draw distance consistent
+const GLfloat G = gameSpeed * 6.6743f * gravityScale;		// Scaled gravitational constant
+const GLfloat epsilon = 0.01f * gravityScale;	// Minimal gravitational force to visualize
+const GLfloat spaceShipSize = 20.0f;
 const GLfloat rotationSpeed = 1.0f / 180.0f * pi;
 const GLfloat boostPower = 2.0f;
-const GLfloat collisionScale = 0.5f;	// Lower value = smaller collision box, negative values possible
 const GLfloat boxSize = 5.0f;
 const GLfloat boxRotation = 1.0f / 180.0f * pi;
 const GLfloat flagSize = 15.0f;
+const GLfloat collisionScale = 0.5f;		// Lower value = smaller collision box, negative values possible
+const GLfloat collisionShip = collisionScale * spaceShipSize * 0.17f;
+const GLfloat collisionBox = collisionScale * boxSize * 0.67f;
+const GLfloat atmosphereScale = 1.1f;
 
 // The core of all physics objects
 // -------------------------------
@@ -46,36 +50,6 @@ protected:
 	// ---------------------------------------------------------------
 	glm::vec2 centrifugalAcceleration(const PointMass& other) const
 	{
-		/*
-		 *	The following algorithm calculates the centrifugal force using the compononent of the velocity vector v
-		 *	orthogonal to the distance vector u pointing towards the other mass. It has been derived using the formula:
-		 *		u*v = |u|*|v|*cos(theta)
-		 *	or for normalized vectors:
-		 *		u*v = cos(theta)
-		 *	For 90° the orbital velocity is equal to the velocity, i.e. scalar = 1 = sin(90°).
-		 *	For 0° the orbital velocity is 0, i.e. scalar = 0 = sin(0°).
-		 *	The vector representing the centrifugal acceleration therefore has the length
-		 *		|v|*|sin(theta)|
-		 *    = |v|*|sin(arccos(u*v))|	, u and v being unit vectors
-		 *	As the centrifugal force pointing into the opposite direction of the distance vector uses the square of the
-		 *	orbital velocity, the absolute value of the sine is neglectable.
-		 */
-
-		/*
-		glm::vec2 rv = this->position - other.getPosition();			// Distance vector pointing away from the other mass
-		GLfloat rl = glm::length(rv);									// Length of the distance vector
-		glm::vec2 rv_u = rv / rl;										// Unit vector
-		
-		glm::vec2 velocity_u = glm::normalize(velocity);				// Velocity unit vector
-		GLfloat angle = acos(glm::dot(rv_u, velocity_u));				// Angle between the 2 unit vectors
-		GLfloat orbitalVelocity = glm::length(velocity) * sin(angle);	// Length of orthogonal component of the velocity vector
-
-		std::cout << "Sine: " << sin(angle) << " Velocity: " << orbitalVelocity << std::endl;
-
-		return orbitalVelocity * orbitalVelocity / rl * rv;
-		*/
-
-		
 		glm::vec2 rv = this->position - other.getPosition();	// Distance vector pointing away from the other mass
 		GLfloat angle = glm::dot(rv, this->velocity);			// Apply centrifugal force if velocity vector is orthogonal
 		GLfloat vl = glm::length(velocity);
@@ -85,7 +59,6 @@ protected:
 
 	// Acceleration depends on which forces are supposed to affect the object
 	virtual void accelerate() {}
-
 
 	// Drawing a disk for a planet (z = 0) or gravity field (z = 0.5)
 	// --------------------------------------------------------------
@@ -148,7 +121,6 @@ public:
 		// glm::vec2 newPosition = position + velocity;
 		position += velocity;
 	}
-
 	
 	// Draws the gravity field
 	// -----------------------
@@ -157,6 +129,8 @@ public:
 		drawDisk(shader, getGravRadius(), -0.5f);
 	}
 
+	// Needed for planets and moons
+	virtual void setTerraforming(unsigned int value) {}
 
 	// Getter functions
 	glm::vec2 getPosition() const
@@ -197,17 +171,16 @@ class Planet : public PointMass
 {
 protected:
 	const glm::vec3 color;
-	GLuint terraforming;
+	GLuint terraforming = 0;
 
 public:
 	// Constructor
 	// -----------
 	Planet(const GLfloat mass, const GLfloat radius, const GLfloat r, const GLfloat g, const GLfloat b, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
-		: PointMass(mass, px, py, vx, vy), color(glm::vec3(r, g, b)), terraforming(0)
+		: PointMass(mass, px, py, vx, vy), color(glm::vec3(r, g, b))
 	{
 		this->radius = radius;
 	};
-
 
 	// Draws the planet
 	// ----------------
@@ -218,10 +191,33 @@ public:
 		drawDisk(shader, radius);
 	}
 
+	// Draws the atmosphere
+	// --------------------
+	void drawAtmosphere(const Shader& shader) const
+	{
+		drawDisk(shader, radius * atmosphereScale * terraforming / 100, 0.5f);
+	}
+
+	void accelerate()
+	{
+		if (terraforming > 0 && terraforming < 100)
+			++terraforming;
+	}
+
+	void setTerraforming(const unsigned int value)
+	{
+		if (!terraforming)
+			terraforming = value;
+	}
+
 	// Getter functions
 	float getRadius() const
 	{
 		return radius;
+	}
+	GLuint getTerraforming() const
+	{
+		return terraforming;
 	}
 	std::string getType() const
 	{
@@ -254,15 +250,19 @@ public:
 
 		// Find velocity:
 		// Find orthogonal unit vector, reverse if !clockwise, find v = sqrt(GM/r)
-		const GLfloat orthogonalAngle = clockwise ? angle + halfPi : angle - halfPi;
+		const GLfloat orthogonalAngle = clockwise ? angle - halfPi : angle + halfPi;
 		velocity = (GLfloat)sqrt(G * refPlanet.getMass() / distance) * glm::vec2(cos(orthogonalAngle), sin(orthogonalAngle));
+		std::cout << "clockwise: " << clockwise << std::endl;
 	}
 
 	void accelerate()
 	{
 		acceleration = gravitationalAcceleration(refPlanet) + centrifugalAcceleration(refPlanet);
-	}
 
+		if (terraforming > 0 && terraforming < 100)
+			++terraforming;
+	}
+	
 	std::string getType() const
 	{
 		return "Moon";
@@ -278,11 +278,12 @@ private:
 	GLfloat angle;
 	GLfloat launchAngle;
 	GLfloat launchSpeed;
-	unsigned int launchState;	// 0 not launched, 1 launching, 2 launched, 3 boosted, 4 landed
+	unsigned int launchState = 0;	// 0 not launched, 1 launching, 2 launched, 3 boosted, 4 landed
+	bool boosted = false;
 
 public:
 	SpaceShip(Planet& startPlanet, GLfloat angle = 90.0f)
-		: PointMass(0, 0, 0), startPlanet(&startPlanet), angle(glm::radians(angle)), launchAngle(glm::radians(angle)), launchState(0), axis(startPlanet.getRadius() + spaceShipSize)
+		: PointMass(0, 0, 0), startPlanet(&startPlanet), angle(glm::radians(angle)), launchAngle(glm::radians(angle)), axis(startPlanet.getRadius() + spaceShipSize)
 	{
 		// Find initial position
 		GLfloat posX = startPlanet.getPosition().x + (GLfloat)cos(angle) * axis;
@@ -306,6 +307,7 @@ public:
 		case 2:
 			velocity.x += boostPower * (GLfloat)cos(angle);
 			velocity.y += boostPower * (GLfloat)sin(angle);
+			boosted = true;
 			++launchState;
 			break;
 		case 3:
@@ -348,21 +350,10 @@ public:
 		case 1:
 			velocity.x = launchSpeed * (GLfloat)cos(angle);
 			velocity.y = launchSpeed * (GLfloat)sin(angle);
-
-			/*
-			/velocity.x += 0.1f * launchSpeed * (GLfloat)cos(angle);
-			/velocity.y += 0.1f * launchSpeed * (GLfloat)sin(angle);
-
-			if (glm::length(velocity) >= launchSpeed)
-			{
-				velocity = glm::normalize(velocity);
-				velocity *= launchSpeed;
-				++launchState;
-			}
-			*/
-
-			++launchState;
+			accelerate(pointMasses);
+			velocity += acceleration;
 			position += velocity;
+			++launchState;
 			break;
 
 		case 4:
@@ -373,25 +364,22 @@ public:
 			accelerate(pointMasses);
 			velocity += acceleration;
 			angle = atan2(velocity.y, velocity.x);	// rotation
-			glm::vec2 newPosition = position + velocity;
+			position += velocity;
 
 			// Check for collision
 			for (PointMass* pm : pointMasses)
 			{
-				if (glm::distance(newPosition, pm->getPosition()) - pm->getRadius() <= collisionScale * spaceShipSize * 0.17f)
+				if (glm::distance(position, pm->getPosition()) - pm->getRadius() <= collisionShip)
 				{
 					launchState = 4;
-					return;
 				}
 			}
-
-			position = newPosition;
 		}
 	}
 
 	void rotate(bool clockwise, bool precisionMode)
 	{
-		const GLfloat precisionScale = precisionMode ? 0.5f : 1.0f;
+		const GLfloat precisionScale = precisionMode ? 0.2f : 1.0f;
 
 		if (launchState == 0)
 		{
@@ -411,21 +399,21 @@ public:
 
 	void adjustSpeed(bool increase, bool precisionMode)
 	{
-		const GLfloat precisionScale = precisionMode ? 0.5f : 1.0f;
+		const GLfloat precisionScale = precisionMode ? 0.1f : 0.5f;
 
 		if (launchState == 0)
 		{
 			if (increase)
-				++launchSpeed;
+				launchSpeed += precisionScale;
 			else
 			{
-				--launchSpeed;
+				launchSpeed -= precisionScale;
 			}
 		}
 		if (launchSpeed < 1)
-			++launchSpeed;
+			launchSpeed = 1;
 		else if (launchSpeed > 10)
-			--launchSpeed;
+			launchSpeed = 10;
 	}
 
 
@@ -471,42 +459,147 @@ public:
 	{
 		this->startPlanet = &newPlanet;
 		axis = startPlanet->getRadius() + spaceShipSize;
+		launchState = 0;
+		boosted = false;
 
 		GLfloat posX = startPlanet->getPosition().x + (GLfloat)cos(angle) * axis;
 		GLfloat posY = startPlanet->getPosition().y + (GLfloat)sin(angle) * axis;
 		position = glm::vec2(posX, posY);
 		if (not reset)
-			launchSpeed = glm::length(gravitationalAcceleration(*startPlanet)) * 50;
-	}
-
-	void setLaunchState(const unsigned int newState)
-	{
-		launchState = newState;
+			launchSpeed = ceil(glm::length(gravitationalAcceleration(*startPlanet)) * 50);
 	}
 
 	unsigned int getLaunchState() const
 	{
 		return launchState;
 	}
-
 	GLfloat getAngle() const
 	{
-		return glm::degrees(angle);
+		return angle;
 	}
-
 	GLfloat getLaunchSpeed() const
 	{
 		return launchSpeed;
 	}
+	bool hasBoosted() const
+	{
+		return boosted;
+	}
 };
 
 
+// Dummy object that mimics the spaceship's behavior to draw its trajectory
+// ------------------------------------------------------------------------
+class Trajectory : public PointMass
+{
+private:
+	const SpaceShip& player;
+	std::vector<PointMass*> pointMasses;
+	std::vector<GLfloat> samples;
+	const unsigned int TTL;
+
+	void accelerate()
+	{
+		acceleration = glm::vec2(0.0f, 0.0f);
+
+		for (auto & pm : pointMasses)
+			acceleration += gravitationalAcceleration(*pm);
+	}
+
+	void move()
+	{
+		for (unsigned int i = 0; i < TTL || (i >= TTL && i % 20 == 0); ++i)
+		{
+			accelerate();
+			velocity += acceleration;
+			position += velocity;
+
+			if (i % 10 == 0)
+			{
+				samples.push_back(position.x);
+				samples.push_back(position.y);
+			}
+				
+			for (PointMass* pm : pointMasses)
+			{
+				if (glm::distance(position, pm->getPosition()) - pm->getRadius() <= collisionShip)
+				{
+					position -= velocity;
+					if (i % 20 == 0)
+						return;
+				}
+			}
+		}
+	}
+
+public:
+	Trajectory(const SpaceShip& player, const std::vector<PointMass*> pointMasses, const unsigned int TTL)
+		: PointMass(0, 0, 0), player(player), pointMasses(pointMasses), TTL(TTL)
+	{
+		update();
+	}
+
+	void update()
+	{
+		samples.clear();
+
+		position = player.getPosition();
+
+		if (player.getLaunchState() > 0)
+			velocity = player.getVelocity();
+		else
+		{
+			velocity.x = player.getLaunchSpeed() * (GLfloat)cos(player.getAngle());
+			velocity.y = player.getLaunchSpeed() * (GLfloat)sin(player.getAngle());
+		}
+		
+		move();
+	}
+
+
+	void draw(Shader shader)
+	{
+		GLuint VBO, VAO;
+		glGenBuffers(1, &VBO);
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * samples.size(), &samples.front(), GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(2*sizeof(float)));
+		glEnableVertexAttribArray(0);
+
+		shader.use();
+		shader.setVec3("color", glm::vec3(114.0f, 191.0f, 68.0f));
+
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
+		shader.setMat4("model", model);
+
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_LINES, 0, samples.size());
+
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+	}
+
+	void setPointMassPointer(const std::vector<PointMass*> pointMasses)
+	{
+		this->pointMasses = pointMasses;
+	}
+};
+
+// Terraforming box to be dropped by the player
+// --------------------------------------------
 class Box : public PointMass
 {
 private:
 	const std::vector<PointMass*> pointMasses;
-	GLfloat rotation;
-	bool landed;
+	GLfloat rotation = 0;
+	bool landed = false;
+	bool processed = false;
 	glm::vec2 restDirection;
 
 	void accelerate(std::vector<PointMass*> pointMasses)
@@ -519,7 +612,7 @@ private:
 
 public:
 	Box(const SpaceShip& player, const std::vector<PointMass*> pointMasses)
-		: PointMass(0, player.getPosition().x, player.getPosition().y), pointMasses(pointMasses), restDirection(-player.getVelocity()), rotation(0), landed(false)
+		: PointMass(0, player.getPosition().x, player.getPosition().y), pointMasses(pointMasses), restDirection(-player.getVelocity())
 	{}
 
 	void accelerate()
@@ -543,8 +636,11 @@ public:
 		// Check for collision
 		for (PointMass* pm : pointMasses)
 		{
-			if (glm::distance(newPosition, pm->getPosition()) - pm->getRadius() <= collisionScale * boxSize * 0.67f)
+			if (glm::distance(newPosition, pm->getPosition()) - pm->getRadius() <= collisionBox)
+			{
 				landed = true;
+				pm->setTerraforming(1);
+			}
 		}
 
 		position += velocity;
@@ -569,7 +665,7 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 12, vertices, GL_STATIC_DRAW);
 
-		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)0);
 		glEnableVertexAttribArray(0);
 
 		// Loading the shader and transforming the disk
@@ -590,16 +686,32 @@ public:
 		glDeleteVertexArrays(1, &VAO);
 		glDeleteBuffers(1, &VBO);
 	}
+
+	void process()
+	{
+		processed = true;
+	}
+
+	bool hasLanded() const
+	{
+		return landed;
+	}
+	bool isProcessed() const
+	{
+		return processed;
+	}
 };
 
 
 class Star
 {
+private:
+	glm::vec2 position;
+
 public:
-	Star(const GLfloat scrWidth, const GLfloat scrHeight)
+	Star(const glm::vec2 position)
 	{
-		// randomize position and radius in initializer list
-		// use velocity for rotation
+		// randomize position, radius and offset in initializer list
 	}
 
 	void draw(const Shader& shader)
@@ -662,7 +774,7 @@ public:
 
 		// Loading the shader and transforming the pole
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(position.x + (flagSize + goal->getRadius()) * cos(time), position.y + (flagSize + goal->getRadius()) * sin(time), 0.5f));
+		model = glm::translate(model, glm::vec3(position.x + (flagSize + goal->getRadius()) * cos(time), position.y + (flagSize + goal->getRadius()) * sin(time), 0.0f));
 		model = glm::rotate(model, time + halfPi, glm::vec3(0.0f, 0.0f, 1.0f));
 		model = glm::scale(model, glm::vec3(flagSize, flagSize, 0.0f));
 		shader.setMat4("model", model);
@@ -674,7 +786,7 @@ public:
 
 		// Transforming the flag
 		model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(position.x + (flagSize * 1.1f + goal->getRadius()) * cos(time), position.y + (flagSize + 0.3f + goal->getRadius()) * sin(time), 0.5f));
+		model = glm::translate(model, glm::vec3(position.x + (flagSize * 0.9f + goal->getRadius()) * cos(time), position.y + (flagSize + 0.3f + goal->getRadius()) * sin(time), 0.0f));
 		model = glm::rotate(model, time - halfPi, glm::vec3(0.0f, 0.0f, 1.0f));
 		model = glm::scale(model, glm::vec3(flagSize, flagSize, 0.0f));
 		shader.setMat4("model", model);

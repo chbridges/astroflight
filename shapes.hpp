@@ -31,12 +31,12 @@ GLfloat * getDisk()
 GLfloat * getSpaceShip()
 {
 	static GLfloat vertices[12] = {
-		 -1.0f,  0.33f,
-		  0.6f,  0.00f,
-		 -0.6f,  0.00f,
-		 -1.0f, -0.33f,
-		  0.6f,  0.00f,
-		 -0.6f,  0.00f
+		 -1.0f,  0.42f,
+		  1.0f,  0.00f,
+		 -0.5f,  0.00f,
+		 -1.0f, -0.42f,
+		  1.0f,  0.00f,
+		 -0.5f,  0.00f
 	};
 
 	return vertices;

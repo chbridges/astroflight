@@ -20,7 +20,7 @@
 
 #if __has_include(<filesystem>)
 #include <filesystem>
-namespace fs = std::filesystem;
+namespace fs = std::experimental::filesystem;
 #elif __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
@@ -33,7 +33,7 @@ const GLuint SCR_WIDTH = 1280;		// Default window width
 const GLuint SCR_HEIGHT = 720;		// Default window height
 const glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
 
-const float physicsFPS = 60.0f;		// Game speed, independent of the rendering speed
+const float physicsFPS = 60.0f;		// Updates per second. 60 ensures fluent visuals, higher values increase game speed
 const unsigned int maxBoxes = 3;
 
 // Mouse and window positions
@@ -44,6 +44,7 @@ double cursorX, cursorY;			// Last cursor position upon left click
 bool windowed = true;
 bool wireframe = false;
 bool clicked = false;
+bool drawTrajectory = false;
 bool nextLevel = false;
 bool restartLevel = false;
 bool showFPS = false;
@@ -54,6 +55,8 @@ bool decreaseSpeed = false;
 bool boost = false;
 bool precisionMode = false;
 bool launch = false;
+bool gameOver = false;
+bool pause = true;
 
 // Selected object for gravity field
 unsigned int planetID = -1;
@@ -134,6 +137,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		}
 	}
 
+	// Draw trajectory with T
+	if (key == GLFW_KEY_T && action == GLFW_PRESS)
+		drawTrajectory = !drawTrajectory;
+
 	// Skip to next level with N
 	if (key == GLFW_KEY_N && action == GLFW_PRESS)
 		nextLevel = true;
@@ -144,6 +151,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		nextLevel = true;
 		restartLevel = true;
 	}
+
+	// Pause game with P
+	if (key == GLFW_KEY_P && action == GLFW_PRESS)
+		pause = !pause;
 
 	// Rotating the space ship with arrow keys
 	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
@@ -331,6 +342,7 @@ int main(int argc, char * argv[])
 	std::cout << "Loading level: " << level.getName() << std::endl;
 	level.genPhysics();
 	SpaceShip player(level.getPlanets()[0]);
+	Trajectory trajectory(player, level.getPhysics(), 2000);
 	Flag flag(level.getPlanets()[1]);
 
 	// GLFW: Setup
@@ -376,14 +388,16 @@ int main(int argc, char * argv[])
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
+	glLineWidth(1);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_MULTISAMPLE);
 
 
 	// Building necessary shader programs
 	// ----------------------------------
+	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship, trajectory
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
-	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship
+	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");
 
 
 	// Game loop
@@ -397,7 +411,7 @@ int main(int argc, char * argv[])
 			lastSecond = currentTime;
 			std::cout << "FPS: " << frameCount << std::endl;
 			frameCount = 0;
-			std::cout << (int)player.getLaunchSpeed();
+			std::cout << "Score: " << level.getScore() << std::endl;
 		}
 		else
 			++frameCount;
@@ -413,21 +427,31 @@ int main(int argc, char * argv[])
 		if (nextLevel)
 		{
 			if (restartLevel)
+			{
 				changeLevel(level, levelID);
+			}
 			else
+			{
 				changeLevel(level);
+				drawTrajectory = false;
+			}
 			level.genPhysics();
 			player.setPlanet(level.getPlanets()[0], true);
-			player.setLaunchState(0);
 			flag.setPlanet(level.getPlanets()[1]);
-			planetID = -1;
-			moonID = -1;
+			trajectory.setPointMassPointer(level.getPhysics());
+			trajectory.update();
+			pause = true;
 			nextLevel = false;
 			restartLevel = false;
+			gameOver = false;
+			planetID = -1;
+			moonID = -1;
 		}
 
 		if (launch)
 		{
+			pause = false;
+
 			if (player.getLaunchState() == 0)
 				player.launchProgress();
 			else if (player.getLaunchState() < 4)
@@ -466,31 +490,68 @@ int main(int argc, char * argv[])
 			if (turnRight)
 				player.rotate(true, precisionMode);
 
-			if (player.getLaunchState() < 4)
-			{
+			if (!pause)
 				level.updatePhysics();
+			if (!pause or player.getLaunchState() == 0)
 				player.move(level.getPhysics());
-				flag.move();
-			}
-			else
+			if (player.getLaunchState() == 0)
+				trajectory.update();
+			flag.move();
+
+			if (!gameOver && player.getLaunchState() == 4)
 			{
-				if (glm::distance(player.getPosition(), level.getPlanets()[1].getPosition()) <= level.getPlanets()[1].getRadius())
+				gameOver = true;
+
+				if (glm::distance(player.getPosition(), level.getPlanets()[1].getPosition()) <= level.getPlanets()[1].getRadius() + collisionShip)
 				{
 					// won
+					level.updateScore(200 - player.hasBoosted() * 100);
+					std::cout << "won\n";
+					// save score
 				}
 				else
 				{
 					// lost
+					std::cout << "lost\n";
 				}
 			}
 
 			// Check if one of the boxes hit a planet
+			for (auto & box : level.getBoxes())
+			{
+				if (box.hasLanded() && !box.isProcessed())
+				{
+					for (auto & planet : level.getPlanets())
+					{
+						if (planet.getTerraforming() == 1 && glm::distance(box.getPosition(), planet.getPosition()) <= planet.getRadius() + collisionBox)
+						{
+							level.updateScore(100);
+							break;
+						}
+					}
+					for (auto & moon : level.getMoons())
+					{
+						if (moon.getTerraforming() == 1 && glm::distance(box.getPosition(), moon.getPosition()) <= moon.getRadius() + collisionBox)
+						{
+							level.updateScore(100);
+							break;
+						}
+					}
+					box.process();
+				}
+			}
 		}
 
 		// Clear buffers
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// Draw objects
+		// Draw gravity field (z = -0.5f)
+		if (planetID != -1)
+			level.getPlanets()[planetID].drawField(shaderField);
+		if (moonID != -1)
+			level.getMoons()[moonID].drawField(shaderField);
+
+		// Draw objects (z = 0.0f)
 		player.draw(shaderSimple);
 		flag.draw(shaderSimple);
 
@@ -503,11 +564,16 @@ int main(int argc, char * argv[])
 		for (auto & box : level.getBoxes())
 			box.draw(shaderSimple);
 
-		// Draw gravity field
-		if (planetID != -1)
-			level.getPlanets()[planetID].drawField(shaderField);
-		if (moonID != -1)
-			level.getMoons()[moonID].drawField(shaderField);
+		// Draw atmospheres (z = 0.5f)
+		for (auto planet : level.getPlanets())
+			planet.drawAtmosphere(shaderAtmosphere);
+		for (auto & moon : level.getMoons())
+			moon.drawAtmosphere(shaderAtmosphere);
+		
+		// Draw trajectory (z = 1.0f)
+		if (drawTrajectory)
+			trajectory.draw(shaderSimple);
+
 
 		// glfw: swap buffers and poll IO events
 		// -------------------------------------
