@@ -33,7 +33,14 @@ const GLuint SCR_WIDTH = 1280;		// Default window width
 const GLuint SCR_HEIGHT = 720;		// Default window height
 const glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
 
-const float physicsFPS = 60.0f;		// Updates per second. 60 ensures fluent visuals, higher values increase game speed
+// OpenGL seems to behave differently on UNIX / Windows
+#ifdef _WIN32
+float physicsFPS = 60.0f;		// Updates per second. 60 ensures fluent visuals, higher values increase game speed
+#else
+float physicsFPS = 120.0f;
+#endif
+
+float speedMultiplicator = 1.0f;
 const unsigned int maxBoxes = 3;
 
 // Mouse and window positions
@@ -67,7 +74,7 @@ std::vector<std::string> levelList;
 unsigned int levelID = 0;
 
 // Tick rate management
-const float physicsTickRate = 1.0f / physicsFPS;	// Physics updates per second
+float physicsTickRate = 1.0f / physicsFPS;		// Physics updates per second
 unsigned int frameCount = 0;						// Frames per second
 double currentTime = glfwGetTime();					// For measuring time intervals
 double lastSecond = currentTime;					// Update every second to measure FPS
@@ -155,6 +162,22 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	// Pause game with P
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
 		pause = !pause;
+
+	// Change game speed
+	if (key == GLFW_KEY_RIGHT_BRACKET && action == GLFW_PRESS && speedMultiplicator < 4.0f)
+	{
+		speedMultiplicator *= 2.0f;
+		physicsFPS *= 2.0f;
+		physicsTickRate = 1.0f / physicsFPS;
+		std::cout << "Game Speed: " << speedMultiplicator << 'x' << std::endl;
+	}
+	if (key == GLFW_KEY_SLASH && action == GLFW_PRESS && speedMultiplicator > 0.25f)
+	{
+		speedMultiplicator *= 0.5f;
+		physicsFPS *= 0.5f;
+		physicsTickRate = 1.0f / physicsFPS;
+		std::cout << "Game Speed: " << speedMultiplicator << 'x' << std::endl;
+	}
 
 	// Rotating the space ship with arrow keys
 	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
@@ -551,6 +574,10 @@ int main(int argc, char * argv[])
 		if (moonID != -1)
 			level.getMoons()[moonID].drawField(shaderField);
 
+		// Draw trajectory (z = -0.25f)
+		if (drawTrajectory)
+			trajectory.draw(shaderSimple);
+
 		// Draw objects (z = 0.0f)
 		player.draw(shaderSimple);
 		flag.draw(shaderSimple);
@@ -569,10 +596,6 @@ int main(int argc, char * argv[])
 			planet.drawAtmosphere(shaderAtmosphere);
 		for (auto & moon : level.getMoons())
 			moon.drawAtmosphere(shaderAtmosphere);
-		
-		// Draw trajectory (z = 1.0f)
-		if (drawTrajectory)
-			trajectory.draw(shaderSimple);
 
 
 		// glfw: swap buffers and poll IO events
