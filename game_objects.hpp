@@ -508,7 +508,7 @@ private:
 
 	void move()
 	{
-		for (unsigned int i = 0; i < TTL || (i >= TTL && i % 20 == 0); ++i)
+		for (unsigned int i = 0; i < TTL || (i >= TTL && samples.size() % 2 != 0); ++i)
 		{
 			accelerate();
 			velocity += acceleration;
@@ -519,13 +519,16 @@ private:
 				samples.push_back(position.x);
 				samples.push_back(position.y);
 			}
-				
+			
+			// Check for collision
 			for (PointMass* pm : pointMasses)
 			{
 				if (glm::distance(position, pm->getPosition()) - pm->getRadius() <= collisionShip)
 				{
-					position -= velocity;
-					if (i % 20 == 0)
+					samples.push_back(position.x);
+					samples.push_back(position.y);
+
+					if (samples.size() % 4 == 0)
 						return;
 				}
 			}
@@ -575,7 +578,7 @@ public:
 		shader.setVec3("color", glm::vec3(114.0f, 191.0f, 68.0f));
 
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.25f));
 		shader.setMat4("model", model);
 
 		glBindVertexArray(VAO);
