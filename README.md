@@ -4,31 +4,37 @@ A 2D puzzle game based on classical mechanics, astronomy and further principles 
 Current development state: Pre-Alpha (essential gameplay features are missing)
 
 ## Compiling
-Required libraries: GLFW3, GLAD, GLM
+Required libraries: GLFW3, GLAD, GLM, FreeType2
 
 GLAD settings: gl 4.6, core profile, generate a loader
 
-Put GLM into the working directory.
+Put GLM into the working directory. As for the other libraries:
 
-Linux: Download GLFW3 and GLAD, compile & install using CMake and Make, compile via compile.sh bash script.
+Linux: Download GLFW3, GLAD and FreeType2, compile & install them, compile AstroFlight via the compile.sh bash script.
 
 Windows: Download the pre-compiled headers for VS or MinGW and link them in your IDE.
 
 ## Controls
-    Arrows  Rotate, Launch & Boost
-    F       Toggle fullscreen/windowed mode
-    W       Toggle wireframe mode
-    R       Restart level
-    N       Next level
-    Esc     Exit
+    Arrows      Adjust rotation and launch speed
+    Spacebar    Launch spacecraft, drop terraforming boxes
+    F           Toggle fullscreen/windowed mode
+    W           Toggle wireframe mode
+    T           Toggle trajectory
+    P           Pause
+    +/-         Adjust game speed
+    R           Restart level
+    N           Next level
+    Esc         Exit
 
 ## Possible upcoming features
-- Collision detection
+- Better GUI, main menu and level selection
+- Stars in background
 - Black holes
-- Terraforming
-- Particle effects
+- Particle effects and lighting
 - Score system
+- Unlockables
 - Level editor
+- Language support (German, English, Russian)
 - Procedural level generation (supported by machine learning)
 
 ## Further planned improvisations
