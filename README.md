@@ -17,6 +17,7 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
 ## Controls
     Arrows      Adjust rotation and launch speed
     Spacebar    Launch spacecraft, drop terraforming boxes
+    Shift       Precision mode (hold)
     F           Toggle fullscreen/windowed mode
     W           Toggle wireframe mode
     T           Toggle trajectory
