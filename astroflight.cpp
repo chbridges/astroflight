@@ -10,6 +10,7 @@
 #include "shapes.hpp"
 #include "game_objects.hpp"
 #include "level.hpp"
+#include "gui.hpp"
 
 // Debug console output
 #include <iostream>		
@@ -133,7 +134,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			//glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
 			windowed = false;
 			const GLFWvidmode * mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-			glfwSetWindowMonitor(window, NULL, 0, 0, mode->width, mode->height, mode->refreshRate);
+			glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, mode->refreshRate);
 		}
 		else
 		{
@@ -421,7 +422,10 @@ int main(int argc, char * argv[])
 	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship, trajectory
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
 	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");
+	Shader shaderText = addShader("vText", "fText");
 
+	// Load GUI
+	GUI::textInit();
 
 	// Game loop
 	// -----------
@@ -596,6 +600,10 @@ int main(int argc, char * argv[])
 			planet.drawAtmosphere(shaderAtmosphere);
 		for (auto & moon : level.getMoons())
 			moon.drawAtmosphere(shaderAtmosphere);
+
+
+		// Draw GUI
+		GUI::renderText(shaderText, "TEST", 25.0f, 25.0f, 1.0f, glm::vec3(0.5f, 0.8f, 0.2f));
 
 
 		// glfw: swap buffers and poll IO events
