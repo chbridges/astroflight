@@ -61,11 +61,11 @@ bool turnRight = false;
 bool increaseSpeed = false;
 bool decreaseSpeed = false;
 bool boost = false;
-bool precisionMode = false;
 bool launch = false;
 bool gameOver = false;
 bool pause = true;
 bool gui = true;
+int precisionMode = 0;
 
 // Selected object for gravity field
 unsigned int planetID = -1;
@@ -202,10 +202,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		turnRight = true;
 	else if (key == GLFW_KEY_RIGHT && action == GLFW_RELEASE)
 		turnRight = false;
-	if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_PRESS)
-		precisionMode = true;
-	else if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_RELEASE)
-		precisionMode = false;
+	if ((key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT) && action == GLFW_PRESS)
+		++precisionMode;
+	else if ((key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT) && action == GLFW_RELEASE)
+		precisionMode = precisionMode > 0 ? precisionMode-1 : 0;
 
 	// Increment/Decrement launch speed or use boost
 	if (key == GLFW_KEY_UP && action == GLFW_PRESS)
@@ -425,7 +425,7 @@ int main(int argc, char * argv[])
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
-	glLineWidth(1);
+	glLineWidth(2);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_MULTISAMPLE);
 
@@ -434,12 +434,16 @@ int main(int argc, char * argv[])
 	// ----------------------------------
 	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship, trajectory
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
-	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");
-	Shader shaderText = addShader("vText", "fText");
+	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");// Atmosphere of planets and moons
+	Shader shaderText = addShader("vText", "fText");				// GUI text
+	Shader shaderBox = addShader("vGUI", "fAlpha");					// GUI text box
 
 	// Load GUI
 	GUI::textInit();
 	std::string guiGameSpeed, guiLaunchSpeed, guiLaunchAngle, guiLevelName, guiScore, guiGameOver, guiMass, guiFPS;
+	GLuint infoBoxAddons = 1;
+	glm::vec3 guiTextColor = glm::vec3(0.5f, 0.8f, 0.2f);
+	glm::vec4 guiBoxColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.5f);
 
 	// Game loop
 	// -----------
@@ -539,12 +543,12 @@ int main(int argc, char * argv[])
 				player.move(level.getPhysics());
 			if (player.getLaunchState() == 0)
 				trajectory.update();
-			flag.move();
+			if (!gameOver)
+				flag.move();
 
 			if (!gameOver && player.getLaunchState() == 4)
 			{
 				gameOver = true;
-				pause = true;
 
 				if (glm::distance(player.getPosition(), level.getPlanets()[1].getPosition()) <= level.getPlanets()[1].getRadius() + collisionShip)
 				{
@@ -623,32 +627,39 @@ int main(int argc, char * argv[])
 		// --------
 		if (gui)
 		{
-			//GUI::renderText(shaderText, "TEST", 25.0f, 25.0f, 1.0f, glm::vec3(0.5f, 0.8f, 0.2f));
+			// Launch settings box
+			GUI::renderBox(shaderBox, 5, 3, 258, 60, guiBoxColor);
+
+			// Info box
+			infoBoxAddons = showFPS + (pause || speedCountdown > 0);
+			GUI::renderBox(shaderBox, 5, SCR_HEIGHT-67-infoBoxAddons*30, 200, 60+infoBoxAddons*30, guiBoxColor);
 
 			// Launch angle
 			guiLaunchAngle = std::to_string(glm::degrees(player.getLaunchAngle())+0.01f);
 			guiLaunchAngle = guiLaunchAngle.substr(0, guiLaunchAngle.length()-5);
+			if (guiLaunchAngle == "360.0")
+				guiLaunchAngle = "0.0";
 			guiLaunchAngle = std::string("Launch angle: ").append(guiLaunchAngle);
-			GUI::renderText(shaderText, guiLaunchAngle, 10, 10, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+			GUI::renderText(shaderText, guiLaunchAngle, 10, 10, 0.5f, guiTextColor);
 
 			// Launch speed
 			guiLaunchSpeed = std::to_string(2*player.getLaunchSpeed()-1);
 			guiLaunchSpeed = std::string("Launch speed:  ").append(guiLaunchSpeed.substr(0, guiLaunchSpeed.length()-5));
-			GUI::renderText(shaderText, guiLaunchSpeed, 10, 40, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+			GUI::renderText(shaderText, guiLaunchSpeed, 10, 40, 0.5f, guiTextColor);
 
 			// Level name
 			guiLevelName = std::string("Level: ").append(level.getName());
-			GUI::renderText(shaderText, guiLevelName, 10, SCR_HEIGHT-30, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+			GUI::renderText(shaderText, guiLevelName, 10, SCR_HEIGHT-30, 0.5f, guiTextColor);
 
 			// Score
 			guiScore = std::string("Score: ").append(std::to_string(level.getScore()));
-			GUI::renderText(shaderText, guiScore, 10, SCR_HEIGHT-60, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+			GUI::renderText(shaderText, guiScore, 10, SCR_HEIGHT-60, 0.5f, guiTextColor);
 
 			// Framerate
 			if (showFPS)
 			{
 				guiFPS = std::string("FPS: ").append(std::to_string(currentFPS));
-				GUI::renderText(shaderText, guiFPS, 10, SCR_HEIGHT-90, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+				GUI::renderText(shaderText, guiFPS, 10, SCR_HEIGHT-90, 0.5f, guiTextColor);
 			}
 
 			// Game speed multiplier and pause notification
@@ -658,7 +669,7 @@ int main(int argc, char * argv[])
 				guiGameSpeed = std::string("Game paused");
 			else
 				guiGameSpeed = std::string("");
-			GUI::renderText(shaderText, guiGameSpeed, 10, SCR_HEIGHT-90-(showFPS)*30, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+			GUI::renderText(shaderText, guiGameSpeed, 10, SCR_HEIGHT-90-(showFPS)*30, 0.5f, guiTextColor);
 
 		}
 

@@ -125,6 +125,43 @@ namespace GUI
         glDeleteVertexArrays(1, &VAO);
 		glDeleteBuffers(1, &VBO);
     }
+
+    void renderBox(const Shader &shader, const GLfloat x, const GLfloat y, const GLfloat width, const GLfloat height, const glm::vec4 color)
+    {
+        shader.use();
+        shader.setVec4("color", color);
+
+        const GLfloat vertices[12] = {
+		    x,          y,
+	    	x,          y+height,
+    		x+width,    y+height,
+		    x,          y,
+	    	x+width,    y,
+    		x+width,    y+height
+	    };
+
+        GLuint VBO, VAO;
+		glGenBuffers(1, &VBO);
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 12, vertices, GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		glm::mat4 model = glm::mat4(1.0f);
+		shader.setMat4("model", model);
+
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, 12);
+
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
+
+    }
 }
 
 #endif

@@ -252,7 +252,6 @@ public:
 		// Find orthogonal unit vector, reverse if !clockwise, find v = sqrt(GM/r)
 		const GLfloat orthogonalAngle = clockwise ? angle - halfPi : angle + halfPi;
 		velocity = (GLfloat)sqrt(G * refPlanet.getMass() / distance) * glm::vec2(cos(orthogonalAngle), sin(orthogonalAngle));
-		std::cout << "clockwise: " << clockwise << std::endl;
 	}
 
 	void accelerate()
