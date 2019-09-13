@@ -65,6 +65,7 @@ bool precisionMode = false;
 bool launch = false;
 bool gameOver = false;
 bool pause = true;
+bool gui = true;
 
 // Selected object for gravity field
 unsigned int planetID = -1;
@@ -81,6 +82,10 @@ double currentTime = glfwGetTime();					// For measuring time intervals
 double lastSecond = currentTime;					// Update every second to measure FPS
 double lastTick = currentTime;						// Update every tick
 double outOfBounds = 0.0f;							// Measures how long player has been outside the window
+
+// GUI
+unsigned int speedCountdown = 0;
+int currentFPS = 0;
 
 
 // GLFW: Callback function for window size
@@ -145,6 +150,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		}
 	}
 
+	// Toggle GUI with G
+	if (key == GLFW_KEY_G && action == GLFW_PRESS)
+		gui = !gui;
+
 	// Draw trajectory with T
 	if (key == GLFW_KEY_T && action == GLFW_PRESS)
 		drawTrajectory = !drawTrajectory;
@@ -160,6 +169,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		restartLevel = true;
 	}
 
+	// Toggle FPS counter with D
+	if (key == GLFW_KEY_D && action == GLFW_PRESS)
+		showFPS = !showFPS;
+
 	// Pause game with P
 	if (key == GLFW_KEY_P && action == GLFW_PRESS)
 		pause = !pause;
@@ -170,14 +183,14 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		speedMultiplicator *= 2.0f;
 		physicsFPS *= 2.0f;
 		physicsTickRate = 1.0f / physicsFPS;
-		std::cout << "Game Speed: " << speedMultiplicator << 'x' << std::endl;
+		speedCountdown = 2;
 	}
 	if (key == GLFW_KEY_SLASH && action == GLFW_PRESS && speedMultiplicator > 0.25f)
 	{
 		speedMultiplicator *= 0.5f;
 		physicsFPS *= 0.5f;
 		physicsTickRate = 1.0f / physicsFPS;
-		std::cout << "Game Speed: " << speedMultiplicator << 'x' << std::endl;
+		speedCountdown = 2;
 	}
 
 	// Rotating the space ship with arrow keys
@@ -426,6 +439,7 @@ int main(int argc, char * argv[])
 
 	// Load GUI
 	GUI::textInit();
+	std::string guiGameSpeed, guiLaunchSpeed, guiLaunchAngle, guiLevelName, guiScore, guiGameOver, guiMass, guiFPS;
 
 	// Game loop
 	// -----------
@@ -433,12 +447,14 @@ int main(int argc, char * argv[])
 	{	
 		currentTime = glfwGetTime();
 
+		// Executes once per second
 		if (currentTime - lastSecond >= 1.0f)
 		{
 			lastSecond = currentTime;
-			std::cout << "FPS: " << frameCount << std::endl;
+			currentFPS = frameCount;
 			frameCount = 0;
-			std::cout << "Score: " << level.getScore() << std::endl;
+			if (speedCountdown)
+				--speedCountdown;
 		}
 		else
 			++frameCount;
@@ -528,6 +544,7 @@ int main(int argc, char * argv[])
 			if (!gameOver && player.getLaunchState() == 4)
 			{
 				gameOver = true;
+				pause = true;
 
 				if (glm::distance(player.getPosition(), level.getPlanets()[1].getPosition()) <= level.getPlanets()[1].getRadius() + collisionShip)
 				{
@@ -603,8 +620,47 @@ int main(int argc, char * argv[])
 
 
 		// Draw GUI
-		GUI::renderText(shaderText, "TEST", 25.0f, 25.0f, 1.0f, glm::vec3(0.5f, 0.8f, 0.2f));
+		// --------
+		if (gui)
+		{
+			//GUI::renderText(shaderText, "TEST", 25.0f, 25.0f, 1.0f, glm::vec3(0.5f, 0.8f, 0.2f));
 
+			// Launch angle
+			guiLaunchAngle = std::to_string(glm::degrees(player.getLaunchAngle())+0.01f);
+			guiLaunchAngle = guiLaunchAngle.substr(0, guiLaunchAngle.length()-5);
+			guiLaunchAngle = std::string("Launch angle: ").append(guiLaunchAngle);
+			GUI::renderText(shaderText, guiLaunchAngle, 10, 10, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+
+			// Launch speed
+			guiLaunchSpeed = std::to_string(2*player.getLaunchSpeed()-1);
+			guiLaunchSpeed = std::string("Launch speed:  ").append(guiLaunchSpeed.substr(0, guiLaunchSpeed.length()-5));
+			GUI::renderText(shaderText, guiLaunchSpeed, 10, 40, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+
+			// Level name
+			guiLevelName = std::string("Level: ").append(level.getName());
+			GUI::renderText(shaderText, guiLevelName, 10, SCR_HEIGHT-30, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+
+			// Score
+			guiScore = std::string("Score: ").append(std::to_string(level.getScore()));
+			GUI::renderText(shaderText, guiScore, 10, SCR_HEIGHT-60, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+
+			// Framerate
+			if (showFPS)
+			{
+				guiFPS = std::string("FPS: ").append(std::to_string(currentFPS));
+				GUI::renderText(shaderText, guiFPS, 10, SCR_HEIGHT-90, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+			}
+
+			// Game speed multiplier and pause notification
+			if (speedCountdown)
+				guiGameSpeed = std::string("Speed: ").append(std::to_string(speedMultiplicator).substr(0,4).append("x"));
+			else if (pause)
+				guiGameSpeed = std::string("Game paused");
+			else
+				guiGameSpeed = std::string("");
+			GUI::renderText(shaderText, guiGameSpeed, 10, SCR_HEIGHT-90-(showFPS)*30, 0.5f, glm::vec3(0.5f, 0.8f, 0.2f));
+
+		}
 
 		// glfw: swap buffers and poll IO events
 		// -------------------------------------

@@ -291,7 +291,7 @@ public:
 		position = glm::vec2(posX, posY);
 
 		// Find minimal launch speed to exit gravity pull
-		launchSpeed = glm::length(gravitationalAcceleration(startPlanet)) * 50;
+		launchSpeed = ceil(glm::length(gravitationalAcceleration(startPlanet)) * 50);
 	}
 
 	void launchProgress(const bool boost = false)
@@ -379,7 +379,7 @@ public:
 
 	void rotate(bool clockwise, bool precisionMode)
 	{
-		const GLfloat precisionScale = precisionMode ? 0.2f : 1.0f;
+		const GLfloat precisionScale = precisionMode ? 0.1f : 1.0f;
 
 		if (launchState == 0)
 		{
@@ -399,7 +399,7 @@ public:
 
 	void adjustSpeed(bool increase, bool precisionMode)
 	{
-		const GLfloat precisionScale = precisionMode ? 0.1f : 0.5f;
+		const GLfloat precisionScale = precisionMode ? 0.05f : 0.5f;
 
 		if (launchState == 0)
 		{
@@ -412,8 +412,8 @@ public:
 		}
 		if (launchSpeed < 1)
 			launchSpeed = 1;
-		else if (launchSpeed > 10)
-			launchSpeed = 10;
+		else if (launchSpeed > 5.5)
+			launchSpeed = 5.5;
 	}
 
 
@@ -476,6 +476,10 @@ public:
 	GLfloat getAngle() const
 	{
 		return angle;
+	}
+	GLfloat getLaunchAngle() const
+	{
+		return launchAngle;
 	}
 	GLfloat getLaunchSpeed() const
 	{
