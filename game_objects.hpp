@@ -195,6 +195,8 @@ public:
 	// --------------------
 	void drawAtmosphere(const Shader& shader) const
 	{
+		shader.use();
+		shader.setVec3("color", glm::vec3(0.0f, 0.0f, 1.0f));
 		drawDisk(shader, radius * atmosphereScale * terraforming / 100, 0.5f);
 	}
 
@@ -805,6 +807,31 @@ public:
 		// Clearing the buffers to avoid memory leak
 		glDeleteVertexArrays(2, VAO);
 		glDeleteBuffers(2, VBO);
+	}
+};
+
+class CenterOfMass : public PointMass
+{
+public:
+	CenterOfMass() : PointMass(0, 0, 0)	{}
+
+	// Find center of mass for given point masses
+	void update(const std::vector<PointMass*>& pointMasses)
+	{
+		int M = 0;
+		for(auto &pm : pointMasses)
+		{
+			M += pm->getMass();
+			position += pm->getMass() * pm->getPosition();
+		}
+		position /= M;
+	}
+
+	void draw(const Shader& shader) const
+	{
+		shader.use();
+		shader.setVec3("color", glm::vec3(255.0f, 255.0f, 0.0f));
+		drawDisk(shader, 10, 0.8f);
 	}
 };
 

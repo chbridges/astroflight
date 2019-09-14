@@ -56,6 +56,7 @@ bool drawTrajectory = false;
 bool nextLevel = false;
 bool restartLevel = false;
 bool showFPS = false;
+bool showCOM = false;				// Center of Mass
 bool turnLeft = false;
 bool turnRight = false;
 bool increaseSpeed = false;
@@ -154,9 +155,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	if (key == GLFW_KEY_G && action == GLFW_PRESS)
 		gui = !gui;
 
-	// Draw trajectory with T
+	// Toggle trajectory with T
 	if (key == GLFW_KEY_T && action == GLFW_PRESS)
 		drawTrajectory = !drawTrajectory;
+
+	// Toggle center of mass with C
+	if (key == GLFW_KEY_C && action == GLFW_PRESS)
+		showCOM = !showCOM;
 
 	// Skip to next level with N
 	if (key == GLFW_KEY_N && action == GLFW_PRESS)
@@ -380,6 +385,7 @@ int main(int argc, char * argv[])
 	level.genPhysics();
 	SpaceShip player(level.getPlanets()[0]);
 	Trajectory trajectory(player, level.getPhysics(), 2000);
+	CenterOfMass centerOfMass;
 	Flag flag(level.getPlanets()[1]);
 
 	// GLFW: Setup
@@ -435,6 +441,7 @@ int main(int argc, char * argv[])
 	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship, trajectory
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
 	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");// Atmosphere of planets and moons
+	Shader shaderCOM = addShader("vGradient", "fGradient");			// Center of mass
 	Shader shaderText = addShader("vText", "fText");				// GUI text
 	Shader shaderBox = addShader("vGUI", "fAlpha");					// GUI text box
 
@@ -543,6 +550,8 @@ int main(int argc, char * argv[])
 				player.move(level.getPhysics());
 			if (player.getLaunchState() == 0)
 				trajectory.update();
+			if (showCOM)
+				centerOfMass.update(level.getPhysics());
 			if (!gameOver)
 				flag.move();
 
@@ -622,6 +631,9 @@ int main(int argc, char * argv[])
 		for (auto & moon : level.getMoons())
 			moon.drawAtmosphere(shaderAtmosphere);
 
+		// Draw center of mass
+		if (showCOM)
+			centerOfMass.draw(shaderCOM);
 
 		// Draw GUI
 		// --------
