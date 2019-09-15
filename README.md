@@ -1,7 +1,7 @@
 # AstroFlight (working title)
 A 2D puzzle game based on classical mechanics, astronomy and further principles of physics. Developed in terms of a computer graphics practical as a pure OpenGL project that doesn't use any external ressources such as textures.
 
-Current development state: Pre-Alpha (essential gameplay features are missing)
+Current development state: Alpha (Menus and a bigger level selection are missing)
 
 ## Compiling
 Required libraries: GLFW3, GLAD, GLM, FreeType2
@@ -20,22 +20,23 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
     Shift       Precision mode (hold)
     F           Toggle fullscreen/windowed mode
     W           Toggle wireframe mode
+    D           Toggle debug mode (FPS counter)
     T           Toggle trajectory
-    P           Pause
-    +/-         Adjust game speed
+    C           Toggle center of mass
     R           Restart level
     N           Next level
+    P           Pause
+    +/-         Adjust game speed (German keyboard layout)
     Esc         Exit
 
 ## Possible upcoming features
 - Better GUI, main menu and level selection
-- Stars in background
 - Black holes
 - Particle effects and lighting
-- Score system
+- Highscore system
 - Unlockables
 - Level editor
-- Language support (German, English, Russian)
+- Additional language support (German, Russian)
 - Procedural level generation (supported by machine learning)
 
 ## Further planned improvisations
