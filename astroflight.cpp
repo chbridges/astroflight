@@ -13,7 +13,10 @@
 #include "gui.hpp"
 
 // Debug console output
-#include <iostream>		
+#include <iostream>	
+
+// Star randomizer
+#include <cstdlib>
 
 // Level list
 #include <vector>
@@ -353,7 +356,33 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 	}
 	
 	level = loadLevelByName(levelList[levelID]);
-	std::cout << "Loaded level: " << level.getName() << std::endl;
+	std::cout << "Loading level: " << level.getName() << std::endl;
+}
+
+// Generate randomized star backgroud
+// --------------
+std::vector<Star> generateStars()
+{
+	std::vector<Star> stars;
+	std::srand(glfwGetTime());
+
+	for (int w = 0; w < SCR_WIDTH; w += SCR_WIDTH / 16)
+	{
+		for (int h = 0; h < SCR_HEIGHT; h += SCR_HEIGHT / 9)
+		{
+			const GLfloat offset = (float)(std::rand() % 6283) / 100.0f;
+
+			stars.push_back(Star(glm::vec2(w,h), glm::vec2(sin(offset), cos(offset))));
+
+			if (w == 0 || w == SCR_WIDTH || h == 0 || h == SCR_HEIGHT)
+			{
+				glm::vec2 lastPos = stars.back().getPosition();
+				if (lastPos.x <= 0 || lastPos.x >= SCR_WIDTH || lastPos.y <= 0 || lastPos.y >= SCR_HEIGHT)
+					stars.pop_back();
+			}
+		}
+	}
+	return stars;
 }
 
 
@@ -387,6 +416,7 @@ int main(int argc, char * argv[])
 	Trajectory trajectory(player, level.getPhysics(), 2000);
 	CenterOfMass centerOfMass;
 	Flag flag(level.getPlanets()[1]);
+	std::vector<Star> stars = generateStars();
 
 	// GLFW: Setup
 	// -----------
@@ -441,7 +471,7 @@ int main(int argc, char * argv[])
 	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship, trajectory
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
 	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");// Atmosphere of planets and moons
-	Shader shaderCOM = addShader("vGradient", "fGradient");			// Center of mass
+	Shader shaderGradient = addShader("vGradient", "fGradient");	// Stars and center of mass
 	Shader shaderText = addShader("vText", "fText");				// GUI text
 	Shader shaderBox = addShader("vGUI", "fAlpha");					// GUI text box
 
@@ -488,6 +518,7 @@ int main(int argc, char * argv[])
 			{
 				changeLevel(level);
 				drawTrajectory = false;
+				stars = generateStars();
 			}
 			level.genPhysics();
 			player.setPlanet(level.getPlanets()[0], true);
@@ -602,6 +633,10 @@ int main(int argc, char * argv[])
 		// Clear buffers
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		// Draw stars (z = -0.9f)
+		for (auto s : stars)
+			s.draw(shaderGradient, glfwGetTime());
+
 		// Draw gravity field (z = -0.5f)
 		if (planetID != -1)
 			level.getPlanets()[planetID].drawField(shaderField);
@@ -633,7 +668,7 @@ int main(int argc, char * argv[])
 
 		// Draw center of mass
 		if (showCOM)
-			centerOfMass.draw(shaderCOM);
+			centerOfMass.draw(shaderGradient);
 
 		// Draw GUI
 		// --------

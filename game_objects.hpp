@@ -714,18 +714,56 @@ public:
 class Star
 {
 private:
-	glm::vec2 position;
+	const glm::vec2 position;
+	const glm::vec2 offset;
+	const GLfloat radius;
+	const GLfloat brightness;
 
 public:
-	Star(const glm::vec2 position)
+	Star(const glm::vec2 position, const glm::vec2 offset)
+		: position(position + 100.0f*offset), radius(glm::length(offset)), brightness((offset.x + offset.y + 2.0f) /4.0f), offset(offset)
+	{}
+
+	void draw(const Shader& shader, const GLfloat time)
 	{
-		// randomize position, radius and offset in initializer list
+		// Getting the vertices of the disk
+		GLfloat * vertices = getDisk();
+
+		// Generating and binding buffers
+		GLuint VBO, VAO;
+		glGenBuffers(1, &VBO);
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * nVertices * 2, vertices, GL_STATIC_DRAW);
+
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Loading the shader and transforming the disk
+		shader.use();
+		GLfloat brightnessVar = brightness + 0.1f*sin(time + offset.x*10);
+		shader.setVec3("color", glm::vec3(1.0f+0.2f*radius*offset.x, 1.0f, 1.0f+0.2f*radius*offset.y) * brightnessVar);
+
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(position.x, position.y, -0.9f));
+		model = glm::scale(model, glm::vec3(radius, radius, 0.0f));
+		shader.setMat4("model", model);
+
+		// Drawing the disk
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, nVertices);
+
+		// Clearing the buffers to avoid memory leak
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
 	}
 
-	void draw(const Shader& shader)
+	glm::vec2 getPosition() const
 	{
-		shader.use();
-		// use sine to vary brightness & size, draw disk with gradient shader
+		return position;
 	}
 };
 
