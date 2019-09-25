@@ -160,7 +160,6 @@ namespace GUI
 
 		glDeleteVertexArrays(1, &VAO);
 		glDeleteBuffers(1, &VBO);
-
     }
 }
 

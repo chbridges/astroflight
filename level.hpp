@@ -20,6 +20,7 @@ private:
 	std::vector<PointMass> pointMasses;
 	std::vector<Planet> planets;
 	std::vector<Moon> moons;
+	std::vector<BlackHole> blackHoles;
 	std::vector<PointMass*> physicsCore;
 	std::vector<Star> stars;
 	std::vector<Box> boxes;
@@ -82,10 +83,20 @@ public:
 				moons.push_back(temp);
 			}
 
+			// Process BlackHole
+			levelFile >> nObjects;
+			while (nObjects--)
+			{
+				levelFile >> mass >> posX >> posY >> vX >> vY;
+				BlackHole temp(mass, posX, posY, vX, vY);
+				blackHoles.push_back(temp);
+			}
+
 			/*
 			std::cout << "Point masses generated: " << pointMasses.size() << std::endl;
 			std::cout << "Planets generated: " << planets.size() << std::endl;
 			std::cout << "Moons generated: " << moons.size() << std::endl;
+			std::cot << "Black holes generated: " << blackHoles.size() << std::endl;
 			*/
 			
 
@@ -111,6 +122,10 @@ public:
 		// Moons
 		for (auto & m : moons)
 			physicsCore.push_back(dynamic_cast<PointMass*>(&m));
+		// Black holes
+		for (auto & bh : blackHoles)
+			physicsCore.push_back(dynamic_cast<PointMass*>(&bh));
+
 		planets[0].setTerraforming(100);
 		planets[1].setTerraforming(100);
 	}
@@ -159,6 +174,10 @@ public:
 	std::vector<Moon>& getMoons()
 	{
 		return moons;
+	}
+	std::vector<BlackHole>& getBlackHoles()
+	{
+		return blackHoles;
 	}
 	std::vector<PointMass*>& getPhysics()
 	{

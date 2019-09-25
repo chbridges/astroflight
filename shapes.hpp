@@ -13,6 +13,8 @@ const GLfloat twicePi = 2.0f * pi;
 const GLfloat halfPi = pi / 2.0f;
 const GLint nSegments = 100;		// Number of circle segments
 const GLint nVertices = nSegments + 2;
+const GLint nSegmentsLow = 10;
+const GLint nVerticesLow = nSegmentsLow + 2;
 
 GLfloat * getDisk()
 {
@@ -22,6 +24,19 @@ GLfloat * getDisk()
 	{
 		vertices[2 * i] = cos(i * twicePi / nSegments);
 		vertices[2 * i + 1] = sin(i * twicePi / nSegments);
+	}
+
+	return vertices;
+}
+
+GLfloat * getLowPolyDisk()
+{
+	static GLfloat vertices[nVertices * 2] = { 0.0f };	// initialize triangle fan with center in (0,0)
+
+	for (int i = 1; i < nVerticesLow; ++i)		// start loop at second vertice
+	{
+		vertices[2 * i] = cos(i * twicePi / nSegmentsLow);
+		vertices[2 * i + 1] = sin(i * twicePi / nSegmentsLow);
 	}
 
 	return vertices;

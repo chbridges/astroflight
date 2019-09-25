@@ -72,8 +72,9 @@ bool gui = true;
 int precisionMode = 0;
 
 // Selected object for gravity field
-unsigned int planetID = -1;
-unsigned int moonID = -1;
+int planetID = -1;
+int moonID = -1;
+int blackHoleID = -1;
 
 // Level management
 std::vector<std::string> levelList;
@@ -257,6 +258,7 @@ void toggleFields(Level level)
 			{
 				planetID = i;
 				moonID = -1;
+				blackHoleID = -1;
 			}
 			else
 				planetID = -1;
@@ -273,9 +275,27 @@ void toggleFields(Level level)
 			{
 				moonID = i;
 				planetID = -1;
+				blackHoleID = -1;
 			}
 			else
 				moonID = -1;
+			return;
+		}
+	}
+
+	std::vector<BlackHole> blackHoles(level.getBlackHoles());
+	for (unsigned int i = 0; i < blackHoles.size(); ++i)
+	{
+		if (glm::distance(blackHoles[i].getPosition(), cursorPos) <= blackHoles[i].getRadius())
+		{
+			if (blackHoleID != i)
+			{
+				blackHoleID = i;
+				planetID = -1;
+				moonID = -1;
+			}
+			else
+				blackHoleID = -1;
 			return;
 		}
 	}
@@ -364,7 +384,7 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 std::vector<Star> generateStars()
 {
 	std::vector<Star> stars;
-	std::srand(glfwGetTime());
+	std::srand((unsigned int)glfwGetTime());
 
 	for (int w = 0; w < SCR_WIDTH; w += SCR_WIDTH / 16)
 	{
@@ -472,15 +492,17 @@ int main(int argc, char * argv[])
 	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
 	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");// Atmosphere of planets and moons
 	Shader shaderGradient = addShader("vGradient", "fGradient");	// Stars and center of mass
+	Shader shaderHorizon = addShader("vGradient", "fHorizon");		// Event horizon of black holes
 	Shader shaderText = addShader("vText", "fText");				// GUI text
 	Shader shaderBox = addShader("vGUI", "fAlpha");					// GUI text box
 
 	// Load GUI
 	GUI::textInit();
 	std::string guiGameSpeed, guiLaunchSpeed, guiLaunchAngle, guiLevelName, guiScore, guiGameOver, guiMass, guiFPS;
-	GLuint infoBoxAddons = 1;
+	GLuint infoBoxAddonsX = level.getName().length();
+	GLuint infoBoxAddonsY = 1;
 	glm::vec3 guiTextColor = glm::vec3(0.5f, 0.8f, 0.2f);
-	glm::vec4 guiBoxColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.5f);
+	glm::vec4 guiBoxColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.2f);
 
 	// Game loop
 	// -----------
@@ -531,6 +553,7 @@ int main(int argc, char * argv[])
 			gameOver = false;
 			planetID = -1;
 			moonID = -1;
+			blackHoleID = -1;
 		}
 
 		if (launch)
@@ -583,8 +606,7 @@ int main(int argc, char * argv[])
 				trajectory.update();
 			if (showCOM)
 				centerOfMass.update(level.getPhysics());
-			if (!gameOver)
-				flag.move();
+			flag.move();
 
 			if (!gameOver && player.getLaunchState() == 4)
 			{
@@ -621,7 +643,7 @@ int main(int argc, char * argv[])
 					{
 						if (moon.getTerraforming() == 1 && glm::distance(box.getPosition(), moon.getPosition()) <= moon.getRadius() + collisionBox)
 						{
-							level.updateScore(100);
+							level.updateScore(200);
 							break;
 						}
 					}
@@ -635,13 +657,15 @@ int main(int argc, char * argv[])
 
 		// Draw stars (z = -0.9f)
 		for (auto s : stars)
-			s.draw(shaderGradient, glfwGetTime());
+			s.draw(shaderGradient, (GLfloat)glfwGetTime());
 
 		// Draw gravity field (z = -0.5f)
 		if (planetID != -1)
 			level.getPlanets()[planetID].drawField(shaderField);
 		if (moonID != -1)
 			level.getMoons()[moonID].drawField(shaderField);
+		if (blackHoleID != -1)
+			level.getBlackHoles()[blackHoleID].drawField(shaderField);
 
 		// Draw trajectory (z = -0.25f)
 		if (drawTrajectory)
@@ -657,6 +681,8 @@ int main(int argc, char * argv[])
 			planet.draw(shaderSimple);
 		for (auto & moon : level.getMoons())
 			moon.draw(shaderSimple);
+		for (auto & bh : level.getBlackHoles())
+			bh.draw(shaderSimple, shaderHorizon);
 		for (auto & box : level.getBoxes())
 			box.draw(shaderSimple);
 
@@ -678,8 +704,9 @@ int main(int argc, char * argv[])
 			GUI::renderBox(shaderBox, 5, 3, 258, 60, guiBoxColor);
 
 			// Info box
-			infoBoxAddons = showFPS + (pause || speedCountdown > 0);
-			GUI::renderBox(shaderBox, 5, SCR_HEIGHT-67-infoBoxAddons*30, 200, 60+infoBoxAddons*30, guiBoxColor);
+			infoBoxAddonsX = level.getName().length();
+			infoBoxAddonsY = showFPS + (pause || speedCountdown > 0);
+			GUI::renderBox(shaderBox, 5, SCR_HEIGHT-67-infoBoxAddonsY*30, 142+infoBoxAddonsX*9, 60+infoBoxAddonsY*30, guiBoxColor);
 
 			// Launch angle
 			guiLaunchAngle = std::to_string(glm::degrees(player.getLaunchAngle())+0.01f);
@@ -713,7 +740,7 @@ int main(int argc, char * argv[])
 			if (speedCountdown)
 				guiGameSpeed = std::string("Speed: ").append(std::to_string(speedMultiplicator).substr(0,4).append("x"));
 			else if (pause)
-				guiGameSpeed = std::string("Game paused");
+				guiGameSpeed = std::string("Paused");
 			else
 				guiGameSpeed = std::string("");
 			GUI::renderText(shaderText, guiGameSpeed, 10, SCR_HEIGHT-90-(showFPS)*30, 0.5f, guiTextColor);

@@ -14,16 +14,19 @@ const GLfloat gameSpeed = 0.5f;
 const GLfloat gravityScale = 1.0f;				// Scales gravity force and keeps draw distance consistent
 const GLfloat G = gameSpeed * 6.6743f * gravityScale;		// Scaled gravitational constant
 const GLfloat epsilon = 0.01f * gravityScale;	// Minimal gravitational force to visualize
+const GLfloat schwartzschild = 0.067*G;			// Multiply with mass for Schwartzschild radius, c^-2 dropped for gameplay reasons
 const GLfloat spaceShipSize = 20.0f;
 const GLfloat rotationSpeed = 1.0f / 180.0f * pi;
 const GLfloat boostPower = 2.0f;
 const GLfloat boxSize = 5.0f;
 const GLfloat boxRotation = 1.0f / 180.0f * pi;
 const GLfloat flagSize = 15.0f;
-const GLfloat collisionScale = 0.5f;		// Lower value = smaller collision box, negative values possible
+const GLfloat collisionScale = 0.5f;			// Lower value = smaller collision box, negative values possible
 const GLfloat collisionShip = collisionScale * spaceShipSize * 0.17f;
 const GLfloat collisionBox = collisionScale * boxSize * 0.67f;
 const GLfloat atmosphereScale = 1.1f;
+
+
 
 // The core of all physics objects
 // -------------------------------
@@ -271,6 +274,32 @@ public:
 };
 
 
+// Same properties as a planet but can't be terraformed, needs 2 shaders and "eats" the space ship upon collision
+// --------------------------------------------------------------------------------------------------------------
+class BlackHole : public Planet
+{
+private:
+	void accelerate() {}
+
+public:
+	BlackHole(const GLfloat mass, const GLfloat px, const GLfloat py, const GLfloat vx = 0, const GLfloat vy = 0)
+		: Planet(mass, schwartzschild*mass, 0, 0, 0, px, py, vx, vy)
+	{}
+
+
+	void draw(const Shader& shaderHole, const Shader& shaderHorizon)
+	{
+		shaderHorizon.use();
+		shaderHorizon.setVec3("color", glm::vec3(1.0f));
+		drawDisk(shaderHorizon, radius * 1.2f, 0.6f);
+		
+		shaderHole.use();
+		shaderHole.setVec3("color", color);
+		drawDisk(shaderHole, radius * 1.1f, 0.7f);
+	}
+};
+
+
 class SpaceShip : public PointMass
 {
 private:
@@ -284,7 +313,7 @@ private:
 
 public:
 	SpaceShip(Planet& startPlanet, GLfloat angle = 90.0f)
-		: PointMass(0, 0, 0), startPlanet(&startPlanet), angle(glm::radians(angle)), launchAngle(glm::radians(angle)), axis(startPlanet.getRadius() + spaceShipSize)
+		: PointMass(0, 0, 0), startPlanet(&startPlanet), angle(glm::radians(angle)), launchAngle(glm::radians(angle)), launchSpeed(2.0f), axis(startPlanet.getRadius() + spaceShipSize)
 	{
 		// Find initial position
 		GLfloat posX = startPlanet.getPosition().x + (GLfloat)cos(angle) * axis;
@@ -292,7 +321,7 @@ public:
 		position = glm::vec2(posX, posY);
 
 		// Find minimal launch speed to exit gravity pull
-		launchSpeed = ceil(glm::length(gravitationalAcceleration(startPlanet)) * 50);
+		// launchSpeed = ceil(glm::length(gravitationalAcceleration(startPlanet)) * 50);
 	}
 
 	void launchProgress(const bool boost = false)
@@ -413,8 +442,8 @@ public:
 		}
 		if (launchSpeed < 1)
 			launchSpeed = 1;
-		else if (launchSpeed > 5.5)
-			launchSpeed = 5.5;
+		else if (launchSpeed > 4.0)
+			launchSpeed = 4.0;
 	}
 
 
@@ -511,6 +540,36 @@ private:
 			acceleration += gravitationalAcceleration(*pm);
 	}
 
+#ifdef _WIN32
+	void move()
+	{
+		for (unsigned int i = 0; i < TTL || (i >= TTL && samples.size() % 4 == 0); ++i)
+		{
+			accelerate();
+			velocity += acceleration;
+			position += velocity;
+
+			if (i % 10 == 0)
+			{
+				samples.push_back(position.x);
+				samples.push_back(position.y);
+			}
+
+			// Check for collision
+			for (PointMass* pm : pointMasses)
+			{
+				if (glm::distance(position, pm->getPosition()) - pm->getRadius() <= collisionShip)
+				{
+					samples.push_back(position.x);
+					samples.push_back(position.y);
+
+					if (samples.size() % 4 == 2)
+						return;
+				}
+			}
+		}
+
+#else
 	void move()
 	{
 		for (unsigned int i = 0; i < TTL || (i >= TTL && samples.size() % 2 != 0); ++i)
@@ -538,6 +597,7 @@ private:
 				}
 			}
 		}
+#endif
 	}
 
 public:
@@ -721,13 +781,13 @@ private:
 
 public:
 	Star(const glm::vec2 position, const glm::vec2 offset)
-		: position(position + 100.0f*offset), radius(glm::length(offset)), brightness((offset.x + offset.y + 2.0f) /4.0f), offset(offset)
+		: position(position + 100.0f*offset), radius(1.0f*glm::length(offset)), brightness((offset.x + offset.y + 2.0f) /4.0f), offset(offset)
 	{}
 
 	void draw(const Shader& shader, const GLfloat time)
 	{
 		// Getting the vertices of the disk
-		GLfloat * vertices = getDisk();
+		GLfloat * vertices = getLowPolyDisk();
 
 		// Generating and binding buffers
 		GLuint VBO, VAO;
@@ -737,7 +797,7 @@ public:
 		glBindVertexArray(VAO);
 
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * nVertices * 2, vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * nVerticesLow * 2, vertices, GL_STATIC_DRAW);
 
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
@@ -745,16 +805,16 @@ public:
 		// Loading the shader and transforming the disk
 		shader.use();
 		GLfloat brightnessVar = brightness + 0.1f*sin(time + offset.x*10);
-		shader.setVec3("color", glm::vec3(1.0f+0.2f*radius*offset.x, 1.0f, 1.0f+0.2f*radius*offset.y) * brightnessVar);
+		shader.setVec3("color", glm::vec3(1.0f-0.2f*radius*offset.y, 0.9f, 1.0f+0.2f*radius*offset.y) * brightnessVar);
 
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(position.x, position.y, -0.9f));
-		model = glm::scale(model, glm::vec3(radius, radius, 0.0f));
+		model = glm::scale(model, glm::vec3(radius+0.5f*brightnessVar, radius+0.5f*brightnessVar, 0.0f));
 		shader.setMat4("model", model);
 
 		// Drawing the disk
 		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLE_FAN, 0, nVertices);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, nVerticesLow);
 
 		// Clearing the buffers to avoid memory leak
 		glDeleteVertexArrays(1, &VAO);
@@ -788,6 +848,7 @@ public:
 
 	void move()
 	{
+		position = goal->getPosition();
 		time = -(GLfloat)glfwGetTime() * 0.1f + 1.6f;
 	}
 
@@ -859,7 +920,7 @@ public:
 		int M = 0;
 		for(auto &pm : pointMasses)
 		{
-			M += pm->getMass();
+			M += (int)pm->getMass();
 			position += pm->getMass() * pm->getPosition();
 		}
 		position /= M;
