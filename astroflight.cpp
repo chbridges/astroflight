@@ -381,18 +381,20 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 
 // Generate randomized star backgroud
 // --------------
-std::vector<Star> generateStars()
+std::vector<Star> generateStars(const int multiplier = 2)
 {
 	std::vector<Star> stars;
 	std::srand((unsigned int)glfwGetTime());
+	GLfloat offset1, offset2;
 
-	for (int w = 0; w < SCR_WIDTH; w += SCR_WIDTH / 16)
+	for (int w = 0; w < SCR_WIDTH; w += SCR_WIDTH / (16 * multiplier))
 	{
-		for (int h = 0; h < SCR_HEIGHT; h += SCR_HEIGHT / 9)
+		for (int h = 0; h < SCR_HEIGHT; h += SCR_HEIGHT / (9 * multiplier))
 		{
-			const GLfloat offset = (float)(std::rand() % 6283) / 100.0f;
+			offset1 = (float)(std::rand() % 2000) / 1000.0f - 1.0f;
+			offset2 = (float)(std::rand() % 2000) / 1000.0f - 1.0f;
 
-			stars.push_back(Star(glm::vec2(w,h), glm::vec2(sin(offset), cos(offset))));
+			stars.push_back(Star(glm::vec2(w,h), glm::vec2(offset1, offset2)));
 
 			if (w == 0 || w == SCR_WIDTH || h == 0 || h == SCR_HEIGHT)
 			{
@@ -402,7 +404,65 @@ std::vector<Star> generateStars()
 			}
 		}
 	}
+
 	return stars;
+}
+
+void drawStars(const std::vector<Star>& stars, const Shader& shader)
+{
+	// Getting the vertices of the disk
+	GLfloat * vertices = getLowPolyDisk();
+
+	// Generating and binding buffers
+	GLuint VBO, VAO;
+	glGenBuffers(1, &VBO);
+
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * nVerticesLow * 2, vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	glBindVertexArray(VAO);
+
+	// Loading the shader and transforming the disk
+	shader.use();
+
+	glm::vec2 position, offset;
+	glm::mat4 model;
+	GLfloat radius, brightness, brightnessVar, colorMod;
+
+	for (auto & star : stars)
+	{
+		position = star.getPosition();
+		offset = star.getOffset();
+		radius = star.getRadius();
+		brightness = star.getBrightness();
+		colorMod = radius+brightness < 1.8f ? 0.0f : 0.4f;
+		brightnessVar = brightness + 0.1f * sin((GLfloat)glfwGetTime() + offset.x * 10.0f);
+
+		if (offset.y < -0.9f)		// very few yellow stars
+			shader.setVec3("color", glm::vec3(1.0f, 1.0f, 1.0f - colorMod) * brightnessVar);
+		else if (offset.y < -0.7f)	// very few purple stars
+			shader.setVec3("color", glm::vec3(1.0f, 1.0f - colorMod, 1.0f) * brightnessVar);
+		else if (offset.y < 0.7f)	// little more red stars
+			shader.setVec3("color", glm::vec3(1.0f, 1.0f - colorMod, 1.0f - colorMod) * brightnessVar);
+		else						// many blue stars
+			shader.setVec3("color", glm::vec3(1.0f - colorMod, 1.0f - colorMod, 1.0f) * brightnessVar);
+
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(position.x, position.y, -0.9f));
+		model = glm::scale(model, glm::vec3(radius + 0.5f * (brightnessVar + colorMod), radius + 0.5f * (brightnessVar + colorMod), 0.0f));
+		shader.setMat4("model", model);
+		
+		glDrawArrays(GL_TRIANGLE_FAN, 0, nVerticesLow);
+	}
+
+	// Clearing the buffers to avoid memory leak
+	glDeleteVertexArrays(1, &VAO);
+	glDeleteBuffers(1, &VBO);
 }
 
 
@@ -488,15 +548,20 @@ int main(int argc, char * argv[])
 
 	// Building necessary shader programs
 	// ----------------------------------
-	Shader shaderSimple = addShader("vSimple", "fSimple");			// Planets, moons, space ship, trajectory
-	Shader shaderField = addShader("vGradient", "fGravField");		// Gravitational fields
-	Shader shaderAtmosphere = addShader("vGradient", "fAtmosphere");// Atmosphere of planets and moons
-	Shader shaderGradient = addShader("vGradient", "fGradient");	// Stars and center of mass
-	Shader shaderHorizon = addShader("vGradient", "fHorizon");		// Event horizon of black holes
+	Shader shaderSimple = addShader("vDefault", "fSimple");			// Black holes, space ship, trajectory
+	Shader shaderLighting = addShader("vDefault", "fLighting");		// Planets, moons
+	Shader shaderField = addShader("vDefault", "fGravField");		// Gravitational fields
+	Shader shaderAtmosphere = addShader("vDefault", "fAtmosphere");	// Atmosphere of planets and moons
+	Shader shaderGradient = addShader("vDefault", "fGradient");		// Stars, center of mass and event horizon of black holes
 	Shader shaderText = addShader("vText", "fText");				// GUI text
 	Shader shaderBox = addShader("vGUI", "fAlpha");					// GUI text box
 
-	// Load GUI
+	// Lighting setup
+	shaderLighting.use();
+	shaderLighting.setVec3("light.color", glm::vec3(255, 255, 255));
+	shaderLighting.setVec3("light.direction", glm::vec3(1.0f, -1.0f, 0.0f));
+
+	// Loading GUI
 	GUI::textInit();
 	std::string guiGameSpeed, guiLaunchSpeed, guiLaunchAngle, guiLevelName, guiScore, guiGameOver, guiMass, guiFPS;
 	GLuint infoBoxAddonsX = level.getName().length();
@@ -656,8 +721,7 @@ int main(int argc, char * argv[])
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Draw stars (z = -0.9f)
-		for (auto s : stars)
-			s.draw(shaderGradient, (GLfloat)glfwGetTime());
+		drawStars(stars, shaderGradient);
 
 		// Draw gravity field (z = -0.5f)
 		if (planetID != -1)
@@ -678,11 +742,11 @@ int main(int argc, char * argv[])
 		for (auto pm : level.getPointMasses())
 			pm.drawField(shaderField);
 		for (auto planet : level.getPlanets())
-			planet.draw(shaderSimple);
+			planet.draw(shaderLighting);
 		for (auto & moon : level.getMoons())
-			moon.draw(shaderSimple);
+			moon.draw(shaderLighting);
 		for (auto & bh : level.getBlackHoles())
-			bh.draw(shaderSimple, shaderHorizon);
+			bh.draw(shaderSimple, shaderGradient);
 		for (auto & box : level.getBoxes())
 			box.draw(shaderSimple);
 

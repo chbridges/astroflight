@@ -7,7 +7,7 @@ in vec2 vtxData;
 
 void main()
 {
-    float alpha = 1.0f - length(vtxData);
+    float alpha = 1.0f - length(vtxData) * length(vtxData) * length(vtxData);
 
     fragColor = vec4(color, alpha);
 }
