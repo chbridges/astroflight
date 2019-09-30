@@ -23,6 +23,7 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
     D           Toggle debug mode (FPS counter)
     T           Toggle trajectory
     C           Toggle center of mass
+    G           Toggle GUI
     R           Restart level
     N           Next level
     P           Pause
