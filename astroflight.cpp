@@ -67,6 +67,8 @@ bool decreaseSpeed = false;
 bool boost = false;
 bool launch = false;
 bool gameOver = false;
+bool gameWon = false;
+bool signalLost = false;
 bool pause = true;
 bool gui = true;
 int precisionMode = 0;
@@ -81,12 +83,13 @@ std::vector<std::string> levelList;
 unsigned int levelID = 0;
 
 // Tick rate management
-float physicsTickRate = 1.0f / physicsFPS;		// Physics updates per second
+float physicsTickRate = 1.0f / physicsFPS;			// Physics updates per second
 unsigned int frameCount = 0;						// Frames per second
 double currentTime = glfwGetTime();					// For measuring time intervals
 double lastSecond = currentTime;					// Update every second to measure FPS
 double lastTick = currentTime;						// Update every tick
 double outOfBounds = 0.0f;							// Measures how long player has been outside the window
+int counter = 0;
 
 // GUI
 unsigned int speedCountdown = 0;
@@ -379,8 +382,8 @@ void changeLevel(Level& level, unsigned int ID = NEXT_LEVEL, bool shuffle = fals
 	std::cout << "Loading level: " << level.getName() << std::endl;
 }
 
-// Generate randomized star backgroud
-// --------------
+// Generate randomized star background
+// -----------------------------------
 std::vector<Star> generateStars(const int multiplier = 2)
 {
 	std::vector<Star> stars;
@@ -497,6 +500,7 @@ int main(int argc, char * argv[])
 	CenterOfMass centerOfMass;
 	Flag flag(level.getPlanets()[1]);
 	std::vector<Star> stars = generateStars();
+	glm::vec2 playerPosition = player.getPosition();
 
 	// GLFW: Setup
 	// -----------
@@ -566,6 +570,7 @@ int main(int argc, char * argv[])
 	std::string guiGameSpeed, guiLaunchSpeed, guiLaunchAngle, guiLevelName, guiScore, guiGameOver, guiMass, guiFPS;
 	GLuint infoBoxAddonsX = level.getName().length();
 	GLuint infoBoxAddonsY = 1;
+	GLuint counterOffset = 0;
 	glm::vec3 guiTextColor = glm::vec3(0.5f, 0.8f, 0.2f);
 	glm::vec4 guiBoxColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.2f);
 
@@ -616,6 +621,8 @@ int main(int argc, char * argv[])
 			nextLevel = false;
 			restartLevel = false;
 			gameOver = false;
+			gameWon = false;
+			signalLost = false;
 			planetID = -1;
 			moonID = -1;
 			blackHoleID = -1;
@@ -651,7 +658,28 @@ int main(int argc, char * argv[])
 				player.adjustSpeed(false, precisionMode);
 			decreaseSpeed = false;
 		}
-			
+		
+		// Check if player is out of bounds
+		playerPosition = player.getPosition();
+		if (playerPosition.x < 0-spaceShipSize || playerPosition.x > SCR_WIDTH+spaceShipSize || playerPosition.y < 0-spaceShipSize || playerPosition.y > SCR_HEIGHT+spaceShipSize)
+		{
+			if (outOfBounds == 0.0f)
+			{
+				outOfBounds = glfwGetTime();
+			}
+			else
+			{
+				if ((currentTime - outOfBounds) * speedMultiplicator >= 5.0f)
+				{
+					gameOver = true;
+					signalLost = true;
+				}
+			}
+		}
+		else
+		{
+			outOfBounds = 0.0f;
+		}
 
 		// Move objects
 		if (currentTime - lastTick > physicsTickRate)
@@ -665,7 +693,7 @@ int main(int argc, char * argv[])
 
 			if (!pause)
 				level.updatePhysics();
-			if (!pause or player.getLaunchState() == 0)
+			if (!gameOver && !pause || player.getLaunchState() == 0)
 				player.move(level.getPhysics());
 			if (player.getLaunchState() == 0)
 				trajectory.update();
@@ -681,13 +709,13 @@ int main(int argc, char * argv[])
 				{
 					// won
 					level.updateScore(200 - player.hasBoosted() * 100);
-					std::cout << "won\n";
+					gameWon = true;
 					// save score
 				}
 				else
 				{
 					// lost
-					std::cout << "lost\n";
+					gameWon = false;
 				}
 			}
 
@@ -760,6 +788,7 @@ int main(int argc, char * argv[])
 		if (showCOM)
 			centerOfMass.draw(shaderGradient);
 
+
 		// Draw GUI
 		// --------
 		if (gui)
@@ -809,6 +838,55 @@ int main(int argc, char * argv[])
 				guiGameSpeed = std::string("");
 			GUI::renderText(shaderText, guiGameSpeed, 10, SCR_HEIGHT-90-(showFPS)*30, 0.5f, guiTextColor);
 
+
+			// Game won/lost message and out-of-bounds-counter
+			if (gameOver)
+			{
+				if (gameWon)
+				{
+					//GUI::renderBox(shaderBox, 520, 335, 242, 50, guiBoxColor);
+					GUI::renderText(shaderText, "You won", 529, 345, 1.0f, guiTextColor);
+				}
+				else if (signalLost)
+				{
+					//GUI::renderBox(shaderBox, 490, 335, 304, 50, guiBoxColor);
+					GUI::renderText(shaderText, "Signal lost", 496, 345, 1.0f, guiTextColor);
+				}
+				else
+				{
+					//GUI::renderBox(shaderBox, 524, 335, 234, 50, guiBoxColor);
+					GUI::renderText(shaderText, "You lost", 533, 345, 1.0f, guiTextColor);
+				}
+			}
+			else if (outOfBounds != 0.0f)
+			{
+				counter = (int)(6.0f - (currentTime - outOfBounds) * speedMultiplicator);
+				//GUI::renderBox(shaderBox, 618, 335, 49, 50, guiBoxColor);
+
+				switch (counter)
+				{
+				case 1:
+					counterOffset = 10;
+					break;
+				case 2:
+					counterOffset = 0;
+					break;
+				case 3:
+					counterOffset = 2;
+					break;
+				case 4:
+					counterOffset = 2;
+					break;
+				case 5:
+					counterOffset = 3;
+					break;
+				default:
+					std::cout << "Error: Invalid outOfBounds counter" << std::endl;
+				}
+
+				GUI::renderText(shaderText, std::to_string(counter), 626 + counterOffset, 345, 1.0f, guiTextColor);
+				
+			}
 		}
 
 		// glfw: swap buffers and poll IO events
