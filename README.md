@@ -30,13 +30,11 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
     Esc         Exit
 
 ## Possible upcoming features
-- Better GUI, main menu and level selection
-- Black holes
-- Particle effects and lighting
+- Main menu and level selection
+- Particle effects
 - Highscore system
 - Unlockables
 - Level editor
-- Additional language support (German, Russian)
 - Procedural level generation (supported by machine learning)
 
 ## Further planned improvisations
