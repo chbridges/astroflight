@@ -8,7 +8,7 @@ Required libraries: GLFW3, GLAD, GLM, FreeType2
 
 GLAD settings: gl 4.6, core profile, generate a loader
 
-Put GLM into the working directory. As for the other libraries:
+Put GLM and glad.c into the working directory. As for the other libraries:
 
 Linux: Download GLFW3, GLAD and FreeType2, compile & install them, compile AstroFlight via the compile.sh bash script.
 
@@ -30,13 +30,11 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
     Esc         Exit
 
 ## Possible upcoming features
-- Better GUI, main menu and level selection
-- Black holes
-- Particle effects and lighting
+- Main menu and level selection
+- Particle effects
 - Highscore system
 - Unlockables
 - Level editor
-- Additional language support (German, Russian)
 - Procedural level generation (supported by machine learning)
 
 ## Further planned improvisations
