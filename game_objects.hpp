@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 // Constants
 const GLfloat gameSpeed = 0.5f;
@@ -40,8 +41,8 @@ protected:
 	glm::vec2 velocity;
 	glm::vec2 acceleration;
 
-	// Calculating the gravitational force applied by another point mass
-	// -----------------------------------------------------------------
+	// Calculating the gravitational force applied by another point mass, doesn't consider own mass
+	// --------------------------------------------------------------------------------------------
 	glm::vec2 gravitationalAcceleration(const PointMass& other) const
 	{
 		glm::vec2 rv = other.getPosition() - this->position;	// Distance vector pointing to the other mass
@@ -291,15 +292,17 @@ public:
 	{
 		shaderHorizon.use();
 		shaderHorizon.setVec3("color", glm::vec3(1.0f));
-		drawDisk(shaderHorizon, radius * 1.2f, 0.6f);
+		drawDisk(shaderHorizon, radius * 1.2f, 0.4f);
 		
 		shaderHole.use();
 		shaderHole.setVec3("color", color);
-		drawDisk(shaderHole, radius * 1.1f, 0.7f);
+		drawDisk(shaderHole, radius * 1.1f, 0.6f);
 	}
 };
 
 
+// The player model and its movement functions
+// -------------------------------------------
 class SpaceShip : public PointMass
 {
 private:
@@ -540,7 +543,6 @@ private:
 			acceleration += gravitationalAcceleration(*pm);
 	}
 
-#ifdef _WIN32
 	void move()
 	{
 		for (unsigned int i = 0; i < TTL || (i >= TTL && samples.size() % 4 == 0); ++i)
@@ -568,36 +570,6 @@ private:
 				}
 			}
 		}
-
-#else
-	void move()
-	{
-		for (unsigned int i = 0; i < TTL || (i >= TTL && samples.size() % 2 != 0); ++i)
-		{
-			accelerate();
-			velocity += acceleration;
-			position += velocity;
-
-			if (i % 10 == 0)
-			{
-				samples.push_back(position.x);
-				samples.push_back(position.y);
-			}
-			
-			// Check for collision
-			for (PointMass* pm : pointMasses)
-			{
-				if (glm::distance(position, pm->getPosition()) - pm->getRadius() <= collisionShip)
-				{
-					samples.push_back(position.x);
-					samples.push_back(position.y);
-
-					if (samples.size() % 4 == 0)
-						return;
-				}
-			}
-		}
-#endif
 	}
 
 public:
@@ -636,7 +608,7 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, VBO);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * samples.size(), &samples.front(), GL_STATIC_DRAW);
 
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(2*sizeof(float)));
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (void*)(2*sizeof(float)));
 		glEnableVertexAttribArray(0);
 
 		shader.use();
@@ -771,6 +743,8 @@ public:
 };
 
 
+// A pole with a rectangle flag marking the goal planet
+// ----------------------------------------------------
 class Flag
 {
 private:
@@ -853,6 +827,8 @@ public:
 };
 
 
+// Yellow disk showing the center of mass of the current planetary system
+// ----------------------------------------------------------------------
 class CenterOfMass : public PointMass
 {
 public:
@@ -874,11 +850,13 @@ public:
 	{
 		shader.use();
 		shader.setVec3("color", glm::vec3(255.0f, 255.0f, 0.0f));
-		drawDisk(shader, 10, 0.8f);
+		drawDisk(shader, 10, 0.7f);
 	}
 };
 
 
+// Oscillating discs in the background
+// -----------------------------------
 class Star
 {
 private:
@@ -907,6 +885,151 @@ public:
 	GLfloat getBrightness() const
 	{
 		return brightness;
+	}
+};
+
+// Draws a gradient rectangle showing the absolute gravitional force
+class GravGradient
+{
+private:
+	std::vector<GLfloat> vertices;
+
+	// Calculating the gravitational force applied by another point mass
+	glm::vec2 gravitationalAcceleration(const glm::vec2 position, PointMass& other) const
+	{
+		glm::vec2 rv = other.getPosition() - position;		// Distance vector pointing to the other mass
+		GLfloat rl = glm::length(rv);						// Length of distance vector
+		return G * other.getMass() / (rl * rl * rl) * rv;
+	}
+
+public:
+	// Calculates the force in each points and generates the vertices vector
+	void update(const GLfloat scrWidth, const GLfloat scrHeight, GLuint xCount, GLuint yCount, std::vector<PointMass*>& pointMasses)
+	{
+		vertices.clear();
+
+		if (xCount == 0)
+			xCount = 2;
+		else if (xCount % 2 == 1)
+			++xCount;
+		if (yCount == 0)
+			yCount = 2;
+		else if (yCount % 2 == 1)
+			++yCount;
+
+		const GLfloat xOffset = scrWidth / (GLfloat)(xCount-1);
+		const GLfloat yOffset = scrHeight / (GLfloat)(yCount-1);
+		
+		std::vector<glm::vec2> positions;
+		std::vector<GLfloat> forces;
+
+		glm::vec2 position;
+		glm::vec2 force;
+
+		bool insidePlanet;
+		GLfloat lastForce;	// Applied when position is inside planet for smoother transitions
+
+		// Get the absolute gravitional force for each point
+		for (GLfloat x = 0.0f; x < scrWidth + 0.5f*xOffset; x += xOffset)
+		{
+			for (GLfloat y = 0.0f; y < scrHeight + 0.5f*yOffset; y += yOffset)
+			{
+				position = glm::vec2(x, y);
+				force = glm::vec2(0.0f);
+				insidePlanet = false;
+
+				for (auto& pm : pointMasses)
+				{
+					if (glm::distance(position, pm->getPosition()) - pm->getRadius() < epsilon)
+					{
+						insidePlanet = true;
+						force = glm::vec2(sqrt(lastForce));
+						break;
+					}
+
+					force += gravitationalAcceleration(position, *pm);
+				}
+
+				if (!insidePlanet)
+					lastForce = glm::length(force);
+
+				positions.push_back(position);
+				if (glm::length(force) > 0.03f)	// Cap the max force to 0.03f to even out huge differences
+					forces.push_back(0.03f);
+				else
+					forces.push_back(glm::length(force));
+			}
+		}
+
+		// Find normalizing function [minForce, maxForce] -> [-1, 1]: 2.0f * (slope * x + yIntercept)
+		const GLfloat minForce = *std::min_element(forces.begin(), forces.end());
+		const GLfloat slope = 1.0f / (*std::max_element(forces.begin(), forces.end()) - minForce);	// Interval of length 1 with slope = 1/(maxForce-minForce)
+		const GLfloat yIntercept = -(slope * minForce) - 0.5f;										// Move interval to [-0.5, 0.5]
+
+		// Normalize the forces vector
+		std::transform(forces.begin(), forces.end(), forces.begin(), [&slope, &yIntercept](GLfloat x) { return 2.0f * (slope * x + yIntercept); });
+		
+		/*
+		for (const auto& i : forces)
+			std::cout << i << std::endl;
+		std::cout << std::endl;
+		*/
+
+		// Generate the vertices vector
+		int currentSamples [6];
+
+		for (unsigned int x = 0; x < xCount-1; ++x)
+		{
+			for (unsigned int y = 0; y < yCount-1; ++y)
+			{
+				currentSamples[0] = y + yCount * x;				// Bottom left
+				currentSamples[1] = (y + 1) + yCount * x;		// Top left
+				currentSamples[2] = (y + 1) + yCount * (x + 1);	// Top right
+				currentSamples[3] = y + yCount * x;				// Bottom left
+				currentSamples[4] = y + yCount * (x + 1);		// Bottom right
+				currentSamples[5] = (y + 1) + yCount * (x + 1);	// Top right
+
+				for (auto cs : currentSamples)
+				{
+					vertices.push_back(positions[cs].x);	// xPos
+					vertices.push_back(positions[cs].y);	// yPos
+					vertices.push_back(1.0f + forces[cs]);	// red
+					vertices.push_back(1.0f - forces[cs]);	// green
+				}	
+			}
+		}
+	}
+
+	// Draws the gradient
+	void draw(const Shader& shader) const
+	{
+		GLuint VBO, VAO;
+		glGenBuffers(1, &VBO);
+
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * vertices.size(), &vertices.front(), GL_STATIC_DRAW);
+
+		// Position attribute
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		// Color attribute
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(float)));
+		glEnableVertexAttribArray(1);
+
+		shader.use();
+		glm::mat4 model = glm::mat4(1.0f);
+		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.8f));
+		shader.setMat4("model", model);
+
+		glBindVertexArray(VAO);
+		glDrawArrays(GL_TRIANGLES, 0, vertices.size() / 4);
+
+		glDeleteVertexArrays(1, &VAO);
+		glDeleteBuffers(1, &VBO);
 	}
 };
 

@@ -24,11 +24,10 @@
 
 #if __has_include(<filesystem>)
 #include <filesystem>
-namespace fs = std::experimental::filesystem;
 #elif __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
 #endif
+namespace fs = std::experimental::filesystem;
 
 constexpr auto NEXT_LEVEL = 999;
 
@@ -60,6 +59,8 @@ bool nextLevel = false;
 bool restartLevel = false;
 bool showFPS = false;
 bool showCOM = false;				// Center of Mass
+bool showGradient = false;			// Gravity gradient
+bool createdGradient = false;
 bool turnLeft = false;
 bool turnRight = false;
 bool increaseSpeed = false;
@@ -90,6 +91,10 @@ double lastSecond = currentTime;					// Update every second to measure FPS
 double lastTick = currentTime;						// Update every tick
 double outOfBounds = 0.0f;							// Measures how long player has been outside the window
 int counter = 0;
+
+// Gravity gradient density
+const int xCount = 160;
+const int yCount = 90;
 
 // GUI
 unsigned int speedCountdown = 0;
@@ -169,6 +174,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	// Toggle center of mass with C
 	if (key == GLFW_KEY_C && action == GLFW_PRESS)
 		showCOM = !showCOM;
+
+	// Toggle gravity gradient with O
+	if (key == GLFW_KEY_O && action == GLFW_PRESS)
+		showGradient = !showGradient;
 
 	// Skip to next level with N
 	if (key == GLFW_KEY_N && action == GLFW_PRESS)
@@ -498,6 +507,8 @@ int main(int argc, char * argv[])
 	SpaceShip player(level.getPlanets()[0]);
 	Trajectory trajectory(player, level.getPhysics(), 2000);
 	CenterOfMass centerOfMass;
+	GravGradient gravGradient;
+	gravGradient.update(SCR_WIDTH, SCR_HEIGHT, xCount, yCount, level.getPhysics());
 	Flag flag(level.getPlanets()[1]);
 	std::vector<Star> stars = generateStars();
 	glm::vec2 playerPosition = player.getPosition();
@@ -557,6 +568,7 @@ int main(int argc, char * argv[])
 	Shader shaderField = addShader("vDefault", "fGravField");		// Gravitational fields
 	Shader shaderAtmosphere = addShader("vDefault", "fAtmosphere");	// Atmosphere of planets and moons
 	Shader shaderGradient = addShader("vDefault", "fGradient");		// Stars, center of mass and event horizon of black holes
+	Shader shaderGravGradient = addShader("vOutColor", "fInColor");	// Gravity gradient
 	Shader shaderText = addShader("vText", "fText");				// GUI text
 	Shader shaderBox = addShader("vGUI", "fAlpha");					// GUI text box
 
@@ -572,7 +584,7 @@ int main(int argc, char * argv[])
 	GLuint infoBoxAddonsY = 1;
 	GLuint counterOffset = 0;
 	glm::vec3 guiTextColor = glm::vec3(0.5f, 0.8f, 0.2f);
-	glm::vec4 guiBoxColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.2f);
+	glm::vec4 guiBoxColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.3f);
 
 	// Game loop
 	// -----------
@@ -617,6 +629,7 @@ int main(int argc, char * argv[])
 			flag.setPlanet(level.getPlanets()[1]);
 			trajectory.setPointMassPointer(level.getPhysics());
 			trajectory.update();
+			createdGradient = false;
 			pause = true;
 			nextLevel = false;
 			restartLevel = false;
@@ -658,28 +671,7 @@ int main(int argc, char * argv[])
 				player.adjustSpeed(false, precisionMode);
 			decreaseSpeed = false;
 		}
-		
-		// Check if player is out of bounds
-		playerPosition = player.getPosition();
-		if (playerPosition.x < 0-spaceShipSize || playerPosition.x > SCR_WIDTH+spaceShipSize || playerPosition.y < 0-spaceShipSize || playerPosition.y > SCR_HEIGHT+spaceShipSize)
-		{
-			if (outOfBounds == 0.0f)
-			{
-				outOfBounds = glfwGetTime();
-			}
-			else
-			{
-				if ((currentTime - outOfBounds) * speedMultiplicator >= 5.0f)
-				{
-					gameOver = true;
-					signalLost = true;
-				}
-			}
-		}
-		else
-		{
-			outOfBounds = 0.0f;
-		}
+
 
 		// Move objects
 		if (currentTime - lastTick > physicsTickRate)
@@ -695,10 +687,11 @@ int main(int argc, char * argv[])
 				level.updatePhysics();
 			if (!gameOver && !pause || player.getLaunchState() == 0)
 				player.move(level.getPhysics());
-			if (player.getLaunchState() == 0)
+			if (player.getLaunchState() == 0 && drawTrajectory)
 				trajectory.update();
 			if (showCOM)
 				centerOfMass.update(level.getPhysics());
+				
 			flag.move();
 
 			if (!gameOver && player.getLaunchState() == 4)
@@ -716,6 +709,31 @@ int main(int argc, char * argv[])
 				{
 					// lost
 					gameWon = false;
+				}
+			}
+
+			// Check if player is out of bounds
+			if (!gameOver)
+			{
+				playerPosition = player.getPosition();
+				if (playerPosition.x < 0 - spaceShipSize || playerPosition.x > SCR_WIDTH + spaceShipSize || playerPosition.y < 0 - spaceShipSize || playerPosition.y > SCR_HEIGHT + spaceShipSize)
+				{
+					if (outOfBounds == 0.0f)
+					{
+						outOfBounds = glfwGetTime();
+					}
+					else
+					{
+						if ((currentTime - outOfBounds) * speedMultiplicator >= 5.0f)
+						{
+							gameOver = true;
+							signalLost = true;
+						}
+					}
+				}
+				else
+				{
+					outOfBounds = 0.0f;
 				}
 			}
 
@@ -773,7 +791,7 @@ int main(int argc, char * argv[])
 			planet.draw(shaderLighting);
 		for (auto & moon : level.getMoons())
 			moon.draw(shaderLighting);
-		for (auto & bh : level.getBlackHoles())
+		for (auto & bh : level.getBlackHoles())		// z = 0.4f (event horizon) and 0.6f (hole)
 			bh.draw(shaderSimple, shaderGradient);
 		for (auto & box : level.getBoxes())
 			box.draw(shaderSimple);
@@ -788,6 +806,18 @@ int main(int argc, char * argv[])
 		if (showCOM)
 			centerOfMass.draw(shaderGradient);
 
+		// Draw gravity gradient
+		if (showGradient)
+		{
+			// Uncomment for better performance
+			//if (!createdGradient)
+			//{
+				gravGradient.update(SCR_WIDTH, SCR_HEIGHT, xCount, yCount, level.getPhysics());
+			//	createdGradient = true;
+			//}
+			gravGradient.draw(shaderGravGradient);
+		}
+			
 
 		// Draw GUI
 		// --------
@@ -845,7 +875,7 @@ int main(int argc, char * argv[])
 				if (gameWon)
 				{
 					//GUI::renderBox(shaderBox, 520, 335, 242, 50, guiBoxColor);
-					GUI::renderText(shaderText, "You won", 529, 345, 1.0f, guiTextColor);
+					GUI::renderText(shaderText, "You won", 528, 345, 1.0f, guiTextColor);
 				}
 				else if (signalLost)
 				{
@@ -881,7 +911,8 @@ int main(int argc, char * argv[])
 					counterOffset = 3;
 					break;
 				default:
-					std::cout << "Error: Invalid outOfBounds counter" << std::endl;
+					//std::cout << "Error: Invalid outOfBounds counter" << std::endl;
+					counter = 5; // time seems to work differently on linux
 				}
 
 				GUI::renderText(shaderText, std::to_string(counter), 626 + counterOffset, 345, 1.0f, guiTextColor);
