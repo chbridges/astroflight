@@ -1,3 +1,0 @@
-moon:	2 boxes, no boost
-slide1:	3 boxes, no boost
-slide2:	3 boxes, no boost - change!

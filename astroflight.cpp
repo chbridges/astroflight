@@ -766,6 +766,9 @@ int main(int argc, char * argv[])
 		// Clear buffers
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		if (wireframe)
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
 		// Draw stars (z = -0.9f)
 		drawStars(stars, shaderGradient);
 
@@ -823,6 +826,9 @@ int main(int argc, char * argv[])
 		// --------
 		if (gui)
 		{
+			if (wireframe)
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
 			// Launch settings box
 			GUI::renderBox(shaderBox, 5, 3, 258, 60, guiBoxColor);
 
