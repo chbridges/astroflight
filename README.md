@@ -3,10 +3,12 @@ A 2D puzzle game based on classical mechanics, astronomy and further principles 
 
 Current development state: Alpha (Menus and a bigger level selection are missing)
 
+**This is a learning project. Due to early problems and a resulting lack of structure and optimization, the code should probably be rewritten entirely and will therefore no longer be actively maintained.**
+
 ## Compiling
 Required libraries: GLFW3, GLAD, GLM, FreeType2
 
-GLAD settings: gl 4.6, core profile, generate a loader
+GLAD settings: gl 3.3 or higher, core profile, generate a loader
 
 Put GLM and glad.c into the working directory. As for the other libraries:
 
@@ -32,12 +34,15 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
     Esc         Exit
 
 ## Possible upcoming features
+- Controls overview in GUI
 - Main menu and level selection
-- Particle effects
 - Highscore system
+- Score system rework (bonus points for landing near the flag, punishments for "cheating")
 - Unlockables
 - Level editor
-- Procedural level generation (supported by machine learning)
+- Procedural level generation (perhaps supported by machine learning)
+- Improved trajectory for dynamic levels using e.g. Euler's method
+- Particle effects
 
 ## Further planned improvisations
-Better code structure, error handling and readme
+Better code structure, error handling and performance optimization
