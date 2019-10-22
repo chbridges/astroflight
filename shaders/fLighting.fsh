@@ -23,5 +23,5 @@ void main()
 
     vec4 mainColor = vec4(color / 255.0f, 1.0f);
 
-    fragColor = mainColor + mainColor * diffuseLighting * pow(length(fragPos), 10.0f);
+    fragColor = mainColor * (1.0f + diffuseLighting * pow(length(fragPos), 10.0f));
 }
