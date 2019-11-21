@@ -6,15 +6,15 @@ Current development state: Alpha (Menus and a bigger level selection are missing
 **This is a learning project. Due to early problems and a resulting lack of structure and optimization, the code should probably be rewritten entirely and will therefore no longer be actively maintained.**
 
 ## Compiling
-Required libraries: GLFW3, GLAD, GLM, FreeType2
+Required libraries: [GLFW3](https://www.glfw.org/), [GLAD](https://glad.dav1d.de/), [GLM](https://glm.g-truc.net/0.9.9/index.html), [FreeType2](https://www.freetype.org/)
 
-GLAD settings: gl 3.3 or higher, core profile, generate a loader
+GLAD settings: gl 3.3 or higher (4.6 has been used), core profile, generate a loader
 
 Put GLM and glad.c into the working directory. As for the other libraries:
 
 Linux: Download GLFW3, GLAD and FreeType2, compile & install them, compile AstroFlight via the compile.sh bash script.
 
-Windows: Download the pre-compiled headers for VS or MinGW and link them in your IDE.
+Windows: Download the pre-compiled headers (GLFW3, GLAD, FreeType2) for VS or MinGW and link them in your IDE.
 
 ## Structure
     /builds/            Contains the latest builds for Win32 and Linux
@@ -27,6 +27,7 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
     level.hpp           Provides the Level class including a level loader and physics engine management
     shader.hpp          Provides the Shader class compiling shader programs with given .fsh and .vsh files
     shapes.hpp          Provides the vertices for shapes to be drawn by OpenGL
+    compile.sh          Compiles the code with all necessary links and flags on Linux
 
 ## Controls
     Arrows      Adjust rotation and launch speed
@@ -58,3 +59,6 @@ Windows: Download the pre-compiled headers for VS or MinGW and link them in your
 
 ## Further planned improvisations
 Better code structure, error handling and performance optimization
+
+## Known bugs
+Wrong structure in a *.lvl file might cause the game not to load
