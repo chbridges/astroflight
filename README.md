@@ -16,6 +16,18 @@ Linux: Download GLFW3, GLAD and FreeType2, compile & install them, compile Astro
 
 Windows: Download the pre-compiled headers for VS or MinGW and link them in your IDE.
 
+## Structure
+    /builds/            Contains the latest builds for Win32 and Linux
+    /gui/               Contains the GUI font and a copyright notice
+    /levels/            Contains levels (plain text files *.lvl) and a .txt file documenting their structure
+    /shaders/           Contains all fragment shaders (*.fsh) and vertex shaders (*.vsh) written in GLSL
+    astroflight.cpp     Manages the window, inputs and ressources, renders the game
+    game_objects.hpp    Provides the PointMass base class and all objects to be rendered
+    gui.hpp             Provides a font renderer and functions to draw GUI boxes and text
+    level.hpp           Provides the Level class including a level loader and physics engine management
+    shader.hpp          Provides the Shader class compiling shader programs with given .fsh and .vsh files
+    shapes.hpp          Provides the vertices for shapes to be drawn by OpenGL
+
 ## Controls
     Arrows      Adjust rotation and launch speed
     Spacebar    Launch spacecraft, drop terraforming boxes
