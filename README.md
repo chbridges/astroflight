@@ -32,7 +32,7 @@ Windows: Download the pre-compiled headers (GLFW3, GLAD, FreeType2) for VS or Mi
 ## Controls
     Arrows      Adjust rotation and launch speed
     Spacebar    Launch spacecraft, drop terraforming boxes
-    Shift       Precision mode (hold)
+    Shift       Precision mode for arrow controls (hold)
     F           Toggle fullscreen/windowed mode
     W           Toggle wireframe mode
     D           Toggle debug mode (FPS counter)
@@ -43,7 +43,7 @@ Windows: Download the pre-compiled headers (GLFW3, GLAD, FreeType2) for VS or Mi
     R           Restart level
     N           Next level
     P           Pause
-    +/-         Adjust game speed (German keyboard layout)
+    +/-         Adjust game speed (German keyboard layout), partially broken on Linux
     Esc         Exit
 
 ## Possible upcoming features
