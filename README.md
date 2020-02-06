@@ -1,5 +1,5 @@
 # AstroFlight (working title)
-A 2D puzzle game based on classical mechanics, astronomy and further principles of physics, taking on a new approach to how gravity works in video games. Developed in terms of a computer graphics practical as a pure OpenGL project that doesn't use any external ressources such as textures, except for the GUI font.
+AstroFlight is a 2D puzzle game based on classical mechanics, astronomy and further principles of physics, taking on a new approach to how gravity works in video games. Developed within the scope of a computer graphics practical at my university, it is designed as a pure OpenGL project that doesn't use any external ressources such as textures, except for the GUI font.
 
 Current development state: Alpha (Menus and a bigger level selection are missing)
 
